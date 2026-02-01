@@ -40,7 +40,7 @@ struct UnknownReasonView: View {
                 }
             }
             .sheet(isPresented: $showWhyAISheet) {
-                WhyAIView(action: { showWhyAISheet = false })
+                WhyAIView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.ultraThinMaterial)
                     .presentationDetents([.medium])
