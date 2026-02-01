@@ -7,10 +7,11 @@
 
 import SwiftUI
 
-enum SheetType: Equatable, Identifiable {
+enum SheetType: Identifiable, Equatable {
     case whyAI
     case languageSupport
     case aiGeneratedAnswer(String)
+    case settings(Binding<ModelConfiguration>)
 
     var id: String {
         switch self {
@@ -20,6 +21,8 @@ enum SheetType: Equatable, Identifiable {
             return "languageSupport"
         case .aiGeneratedAnswer:
             return "aiGeneratedAnswer"
+        case .settings:
+            return "settings"
         }
     }
 
@@ -35,13 +38,25 @@ enum SheetType: Equatable, Identifiable {
 
         case .languageSupport:
             LanguageSupportView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(.ultraThinMaterial)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
 
         case .aiGeneratedAnswer(let answer):
             AIGeneratedAnswerSheet(answer: answer)
+                .background(.ultraThinMaterial)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+
+        case .settings(let config):
+            ModelSettingsSheet(configuration: config)
+                .background(.ultraThinMaterial)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
+    }
+
+    static func == (lhs: SheetType, rhs: SheetType) -> Bool {
+        return lhs.id == rhs.id
     }
 }

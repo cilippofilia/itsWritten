@@ -40,11 +40,6 @@
 			path = Written;
 			sourceTree = "<group>";
 		};
-		18CA904E2F129D5C007FAA4B /* WrittenTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WrittenTests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,7 +64,6 @@
 			isa = PBXGroup;
 			children = (
 				18A488F02E68BD5F00A87380 /* Written */,
-				18CA904E2F129D5C007FAA4B /* WrittenTests */,
 				18A488EF2E68BD5F00A87380 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -121,9 +115,6 @@
 			);
 			dependencies = (
 				18CA90522F129D5C007FAA4B /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				18CA904E2F129D5C007FAA4B /* WrittenTests */,
 			);
 			name = WrittenTests;
 			packageProductDependencies = (

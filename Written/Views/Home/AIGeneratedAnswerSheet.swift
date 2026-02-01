@@ -9,27 +9,18 @@ import SwiftUI
 
 struct AIGeneratedAnswerSheet: View {
     @Environment(HomeViewModel.self) private var viewModel
-    @Environment(\.dismiss) private var dismiss
 
     let answer: String
 
     var body: some View {
-        NavigationStack {
-            AIGeneratedAnswerView(answer: answer)
-                .background(.ultraThinMaterial)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done", systemImage: "xmark") {
-                            dismiss()
-                        }
-                    }
-                }
-                .onDisappear {
-                    viewModel.session = nil
-                }
+        ScrollView(.vertical, showsIndicators: true) {
+            Text(.init(answer))
+                .padding()
+                .foregroundStyle(.primary)
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.vertical)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
 

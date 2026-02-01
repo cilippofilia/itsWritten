@@ -20,13 +20,15 @@ struct HomeContentView: View {
 
     @Binding var shouldSend: Bool
 
+    let session: LanguageModelSession
+
     var body: some View {
         VStack {
             HomeTextEditor(
                 text: $text,
                 isFocused: $isFocused,
                 placeholderText: viewModel.placeholderText,
-                isResponding: viewModel.session?.isResponding ?? false
+                isResponding: session.isResponding
             )
 
             if countDownViewModel.timerActive || countDownViewModel.timerPaused {
@@ -41,7 +43,7 @@ struct HomeContentView: View {
         .safeAreaInset(edge: .bottom) {
             HomeFooterView(
                 text: text,
-                isResponding: viewModel.session?.isResponding ?? false,
+                isResponding: session.isResponding,
                 sendAction: {
                     shouldSend = true
                 }
@@ -88,11 +90,6 @@ extension HomeContentView {
         isFocused = false
         activeAlert = nil
 
-        guard let session = viewModel.session else {
-            showOverlayView = false
-            return
-        }
-
         do {
             let answer = try await streamResponse(from: session, input: input)
             let history = HistoryModel(prompt: input, response: .init(answer))
@@ -111,8 +108,13 @@ extension HomeContentView {
     }
 
     @MainActor
-    private func streamResponse(from session: LanguageModelSession, input: String) async throws -> String {
-        let stream = session.streamResponse(to: input)
+    private func streamResponse(
+        from session: LanguageModelSession,
+        input: String
+    ) async throws -> String {
+        // Compact the session before sending if transcript is getting large
+        let compactedSession = compactedSession(from: session)
+        let stream = compactedSession.streamResponse(to: input)
         var fullAnswer = ""
 
         for try await partial in stream {
@@ -151,10 +153,42 @@ extension HomeContentView {
 
         return .aiGeneration(title: title, message: message)
     }
+
+    private func compactedSession(
+        from previousSession: LanguageModelSession,
+        maxCharacters: Int = 4000
+    ) -> LanguageModelSession {
+        let entries = previousSession.transcript
+        // Bail out if there's nothing to compact
+        guard let first = entries.first else { return previousSession }
+        var selected = [first]
+        var totalInstructionLength = String(describing: first).count
+        var recentEntries: [Transcript.Entry] = []
+
+        // Count backwards, because the most recent entries
+        // are the most relevant ones to the user.
+        for entry in entries.dropFirst().reversed() {
+            let entryEstimatelength = String(describing: entry).count
+            // Bail out if adding this would push us over our limit.
+            guard totalInstructionLength + entryEstimatelength <= maxCharacters else { break }
+            // Add this to the *start* of recentEntries,
+            // because we're working backwards.
+            recentEntries.insert(entry, at: 0)
+            // Add its length to our length tracker.
+            totalInstructionLength += entryEstimatelength
+        }
+        selected.append(contentsOf: recentEntries)
+
+        // Return new session from the compacted transcript.
+        return LanguageModelSession(transcript: Transcript(entries: selected))
+    }
 }
 
 #Preview {
-    HomeContentView(shouldSend: .constant(false))
-        .environment(HomeViewModel())
-        .environment(CountdownViewModel())
+    HomeContentView(
+        shouldSend: .constant(false),
+        session: LanguageModelSession()
+    )
+    .environment(HomeViewModel())
+    .environment(CountdownViewModel())
 }

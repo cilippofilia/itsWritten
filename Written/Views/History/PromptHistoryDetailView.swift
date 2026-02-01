@@ -15,14 +15,14 @@ struct PromptHistoryDetailView: View {
             VStack(alignment: .leading) {
                 // TODO: summarize prompt with AI
                 Text("Prompt \(history.id) Summary")
-                    .font(.title)
+                    .font(.title2)
                     .bold()
-                    .padding(.bottom)
+                    .padding(.vertical)
 
                 VStack(alignment: .trailing) {
                     Text("You asked:")
                         .foregroundStyle(.secondary)
-                    Text("\(history.prompt)")
+                    Text(history.prompt)
                         .bold()
                 }
                 .frame(
@@ -32,9 +32,9 @@ struct PromptHistoryDetailView: View {
                 .padding([.bottom, .leading])
 
                 VStack(alignment: .leading) {
-                    Text("The response you received:")
+                    Text("The response:")
                         .foregroundStyle(.secondary)
-                    Text("\(history.response)")
+                    Text(.init(history.response))
                 }
                 .frame(
                     maxWidth: .infinity,
@@ -43,8 +43,6 @@ struct PromptHistoryDetailView: View {
                 .padding([.bottom, .trailing])
             }
             .padding()
-
-            Spacer().frame(height: 120)
         }
     }
 }
