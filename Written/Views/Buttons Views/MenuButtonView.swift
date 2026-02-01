@@ -11,6 +11,7 @@ struct MenuButtonView: View {
     @Binding var selectedModel: AIModel
     let aiModels: [AIModel]
     @Binding var showWhyAISheet: Bool
+    @Binding var showLanguageSupportSheet: Bool
     @Binding var showHistoryView: Bool
 
     var body: some View {
@@ -37,6 +38,12 @@ struct MenuButtonView: View {
             Divider()
 
             Button(action: {
+                showLanguageSupportSheet = true
+            }) {
+                Label("Language support", systemImage: "translate")
+            }
+
+            Button(action: {
                 showWhyAISheet = true
             }) {
                 Label("Why AI?", systemImage: "sparkles")
@@ -57,6 +64,7 @@ struct MenuButtonView: View {
         selectedModel: .constant(AIModel(id: "", title: "", prompt: "")),
         aiModels: [],
         showWhyAISheet: .constant(false),
+        showLanguageSupportSheet: .constant(false),
         showHistoryView: .constant(false)
     )
 }

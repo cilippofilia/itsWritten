@@ -26,6 +26,7 @@ struct HomeView: View {
 
     @State private var showAIGeneratedAnswer: Bool = false
     @State private var showWhyAISheet: Bool = false
+    @State private var showLanguageSupportSheet: Bool = false
     @State private var showHistoryView: Bool = false
     @State private var showOverlayView: Bool = false
 
@@ -56,6 +57,7 @@ struct HomeView: View {
                             ),
                             aiModels: viewModel.aiModelList,
                             showWhyAISheet: $showWhyAISheet,
+                            showLanguageSupportSheet: $showLanguageSupportSheet,
                             showHistoryView: $showHistoryView
                         )
                         .onChange(of: viewModel.selectedAIModel) { _, newModel in
@@ -68,10 +70,17 @@ struct HomeView: View {
                 footerView
             }
             .sheet(isPresented: $showWhyAISheet) {
-                WhyAIView(action: { showWhyAISheet = false })
+                WhyAIView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.ultraThinMaterial)
                     .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showLanguageSupportSheet) {
+                LanguageSupportView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.ultraThinMaterial)
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAIGeneratedAnswer) {
