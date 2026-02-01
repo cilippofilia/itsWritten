@@ -40,9 +40,30 @@ struct PromptHistoryDetailView: View {
                     maxWidth: .infinity,
                     alignment: .leading
                 )
-                .padding([.bottom, .trailing])
+                .padding(.trailing)
             }
             .padding()
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollIndicators(.hidden)
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.clear, .black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 40)
+
+                Rectangle()
+
+                LinearGradient(
+                    colors: [.black, .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 40)
+            }
         }
     }
 }

@@ -18,8 +18,34 @@ struct AIGeneratedAnswerSheet: View {
                 .padding()
                 .foregroundStyle(.primary)
                 .scrollBounceBehavior(.basedOnSize)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .leading
+                )
+                .ignoresSafeArea()
                 .padding(.vertical)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollIndicators(.hidden)
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.clear, .black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 40)
+
+                Rectangle()
+
+                LinearGradient(
+                    colors: [.black, .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 40)
+            }
         }
     }
 }
