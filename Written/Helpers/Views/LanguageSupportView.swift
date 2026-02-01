@@ -13,7 +13,7 @@ struct LanguageSupportView: View {
 
     var body: some View {
         Form {
-            Section("Language Support") {
+            Section {
                 let currentLanguage = Locale.current.language
                 let isSupported = model.supportedLanguages.contains(currentLanguage)
 
@@ -28,8 +28,10 @@ struct LanguageSupportView: View {
                     Label("Current language is not supported", systemImage: "xmark.circle.fill")
                         .foregroundStyle(.red)
                 }
+            } header: {
+                Text("Language Support")
+                    .padding(.top)
             }
-            .padding(.top)
 
             Section("Supported Languages") {
                 ForEach(Array(model.supportedLanguages).sorted(by: { displayName(for: $0) < displayName(for: $1) }), id: \.self) { language in

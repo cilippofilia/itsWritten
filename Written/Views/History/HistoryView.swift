@@ -18,45 +18,9 @@ struct HistoryView: View {
         NavigationStack {
             Group {
                 if viewModel.history.isEmpty {
-                    ContentUnavailableView(
-                        "No History",
-                        systemImage: "clock.arrow.circlepath",
-                        description: Text("Your conversation history will appear here")
-                    )
+                    unavailableView
                 } else {
-                    List {
-                        ForEach(viewModel.history.reversed()) { convo in
-                            Button(action: {
-                                selectedHistory = convo
-                                showPromptHistory = true
-                            }) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Prompt \(convo.id)")
-                                        .bold()
-
-                                    Group {
-                                        Text(convo.prompt)
-                                            .frame(maxWidth: .infinity, alignment: .trailing)
-                                            .bold()
-                                            .padding(.leading)
-
-                                        Text(convo.response)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.trailing)
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(3)
-                                }
-                                .padding()
-                                .background(.ultraThinMaterial)
-                                .clipShape(.rect(cornerRadius: 12, style: .continuous))
-                                .contentShape(.rect(cornerRadius: 12, style: .continuous))
-                                .listRowInsets(.init(top: 6, leading: 12, bottom: 6, trailing: 12))
-                            }
-                            .listRowSeparator(.hidden)
-                        }
-                    }
-                    .listStyle(.plain)
+                    availableView
                 }
             }
             .navigationTitle("History")
@@ -71,23 +35,56 @@ struct HistoryView: View {
             }
             .sheet(isPresented: $showPromptHistory) {
                 if let history = selectedHistory {
-                    NavigationStack {
-                        PromptHistoryDetailView(history: history)
-                            .toolbar {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button(action: {
-                                        showPromptHistory = false
-                                    }) {
-                                        Label("Done", systemImage: "xmark")
-                                    }
-                                }
-                            }
-                    }
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+                    PromptHistoryDetailView(history: history)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
                 }
             }
         }
+    }
+
+    var unavailableView: some View {
+        ContentUnavailableView(
+            "No History",
+            systemImage: "clock.arrow.circlepath",
+            description: Text("Your conversation history will appear here")
+        )
+    }
+
+    var availableView: some View {
+        List {
+            ForEach(viewModel.history.reversed()) { convo in
+                Button(action: {
+                    selectedHistory = convo
+                    showPromptHistory = true
+                }) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Prompt \(convo.id)")
+                            .bold()
+
+                        Group {
+                            Text(convo.prompt)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .bold()
+                                .padding(.leading)
+
+                            Text(convo.response)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.trailing)
+                        }
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    }
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .clipShape(.rect(cornerRadius: 12, style: .continuous))
+                    .contentShape(.rect(cornerRadius: 12, style: .continuous))
+                    .listRowInsets(.init(top: 6, leading: 6, bottom: 0, trailing: 6))
+                }
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
     }
 }
 

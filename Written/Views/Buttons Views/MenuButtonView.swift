@@ -8,26 +8,15 @@
 import SwiftUI
 
 struct MenuButtonView: View {
-    @Binding var selectedModel: AIModel
-    let aiModels: [AIModel]
     @Binding var showWhyAISheet: Bool
     @Binding var showLanguageSupportSheet: Bool
     @Binding var showHistoryView: Bool
+    @Binding var showSettings: Bool
 
     var body: some View {
         Menu {
             // TODO: ideas to implement
             Label("Onboarding", systemImage: "book.pages")
-
-            Menu {
-                Picker("", selection: $selectedModel) {
-                    ForEach(aiModels, id: \.self) { model in
-                        Text(model.title)
-                    }
-                }
-            } label: {
-                Label("Model types", systemImage: "brain")
-            }
 
             Button(action: {
                 showHistoryView = true
@@ -48,6 +37,14 @@ struct MenuButtonView: View {
             }) {
                 Label("Why AI?", systemImage: "sparkles")
             }
+
+            #if DEBUG
+            Divider()
+
+            Button("Settings", systemImage: "gearshape") {
+                showSettings = true
+            }
+            #endif
         } label: {
             Label("Menu", systemImage: "line.3.horizontal")
                 .labelStyle(.iconOnly)
@@ -61,10 +58,9 @@ struct MenuButtonView: View {
 
 #Preview {
     MenuButtonView(
-        selectedModel: .constant(AIModel(id: "", title: "", prompt: "")),
-        aiModels: [],
         showWhyAISheet: .constant(false),
         showLanguageSupportSheet: .constant(false),
-        showHistoryView: .constant(false)
+        showHistoryView: .constant(false),
+        showSettings: .constant(false)
     )
 }
