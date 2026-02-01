@@ -13,21 +13,34 @@ struct PromptHistoryDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
+                // TODO: summarize prompt with AI
                 Text("Prompt \(history.id) Summary")
                     .font(.title)
                     .bold()
                     .padding(.bottom)
 
-                Text("\(history.prompt)")
-                    .bold()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .foregroundStyle(.red)
-                    .padding([.bottom, .leading])
+                VStack(alignment: .trailing) {
+                    Text("You asked:")
+                        .foregroundStyle(.secondary)
+                    Text("\(history.prompt)")
+                        .bold()
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .trailing
+                )
+                .padding([.bottom, .leading])
 
-                Text("\(history.response)")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.blue)
-                    .padding([.bottom, .trailing])
+                VStack(alignment: .leading) {
+                    Text("The response you received:")
+                        .foregroundStyle(.secondary)
+                    Text("\(history.response)")
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .padding([.bottom, .trailing])
             }
             .padding()
 
