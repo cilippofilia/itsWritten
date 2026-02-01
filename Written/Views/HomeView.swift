@@ -17,18 +17,20 @@ struct HomeView: View {
     @Environment(CountdownViewModel.self) var countDownViewModel
     @FocusState private var isFocused: Bool
 
-    @State private var text: String  = ""
-    @State private var aiAnswer: String  = ""
+    @State private var text: String = ""
+    @State private var aiAnswer: String = ""
 
     @State private var activeAlert: AlertType?
-    @State private var errorTitle: String? = nil
-    @State private var errorMessage: String? = nil
+    @State private var errorTitle: String?
+    @State private var errorMessage: String?
 
     @State private var showAIGeneratedAnswer: Bool = false
     @State private var showWhyAISheet: Bool = false
+    @State private var showHistoryView: Bool = false
     @State private var showOverlayView: Bool = false
 
     @State private var shouldSend: Bool = false
+    @State private var isDisabled: Bool = true
 
     var body: some View {
         NavigationStack {
@@ -53,7 +55,8 @@ struct HomeView: View {
                                 set: { viewModel.updateSelection(to: $0) }
                             ),
                             aiModels: viewModel.aiModelList,
-                            showWhyAISheet: $showWhyAISheet
+                            showWhyAISheet: $showWhyAISheet,
+                            showHistoryView: $showHistoryView
                         )
                         .onChange(of: viewModel.selectedAIModel) { _, newModel in
                             selectedModelID = newModel.id
@@ -72,18 +75,35 @@ struct HomeView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAIGeneratedAnswer) {
-                AIGeneratedAnswerView(answer: aiAnswer)
-                    .background(.ultraThinMaterial)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                    .transition(.opacity)
-                    .onAppear {
-                        showOverlayView = false
-                    }
-                    .onDisappear {
-                        viewModel.session = nil
-                        text = ""
-                    }
+                NavigationStack {
+                    AIGeneratedAnswerView(answer: aiAnswer)
+                        .background(.ultraThinMaterial)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                        .transition(.opacity)
+                        .onAppear {
+                            showOverlayView = false
+                        }
+                        .onDisappear {
+                            viewModel.session = nil
+                            text = ""
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(action: {
+                                    showAIGeneratedAnswer = false
+                                }) {
+                                    Label("Done", systemImage: "xmark")
+                                }
+                                .disabled(isDisabled)
+                            }
+                        }
+                }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
+            .navigationDestination(isPresented: $showHistoryView) {
+                HistoryView()
             }
             .onAppear {
                 viewModel.prepareInitialState(storedModelID: selectedModelID)
@@ -181,12 +201,17 @@ extension HomeView {
 
         do {
             let stream = session.streamResponse(to: input)
+            var fullAnswer: String = ""
             for try await partial in stream {
                 aiAnswer = partial.content
+                fullAnswer = partial.content
                 withAnimation {
                     showAIGeneratedAnswer = true
                 }
             }
+            let history: HistoryModel = HistoryModel(prompt: input, response: .init(fullAnswer))
+            viewModel.history.append(history)
+            isDisabled = false
         } catch let error as LanguageModelSession.GenerationError {
             handleGenerationError(error)
         } catch {

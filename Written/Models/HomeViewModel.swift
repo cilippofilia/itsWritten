@@ -14,7 +14,8 @@ public class HomeViewModel {
     var placeholderText: String = ""
     var selectedAIModel: AIModel
     var session: LanguageModelSession?
-
+    var history: [HistoryModel] = []
+    
     init(selectedPrompt: AIModel? = nil) {
         self.selectedAIModel = selectedPrompt ?? aiModelList.first!
     }

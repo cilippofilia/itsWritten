@@ -14,7 +14,6 @@ struct RespondingIndicator: View {
     var body: some View {
         Image(systemName: "brain")
             .font(.largeTitle)
-            .symbolRenderingMode(.multicolor)
             .foregroundStyle(foregroundColor)
             .hueRotation(.degrees(animationPhase * 360))
             .scaleEffect(scaleAmount)

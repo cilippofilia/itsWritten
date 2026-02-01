@@ -19,25 +19,6 @@ struct AIGeneratedAnswerView: View {
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .mask {
-            VStack(spacing: 0) {
-                LinearGradient(
-                    colors: [.clear, .black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 50)
-
-                Rectangle()
-
-                LinearGradient(
-                    colors: [.black, .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 50)
-            }
-        }
     }
 }
 
