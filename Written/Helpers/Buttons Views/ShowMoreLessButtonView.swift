@@ -8,15 +8,17 @@
 import SwiftUI
 
 struct ShowMoreLessButtonView: View {
-    @Binding var isPromptExpanded: Bool
+    @Binding var isExpanded: Bool
+
+    let action: ActionVoid
 
     var body: some View {
         Button {
             withAnimation {
-                isPromptExpanded.toggle()
+                action()
             }
         } label: {
-            Text(isPromptExpanded ? "Show less" : "Show more")
+            Text(isExpanded ? "Show less" : "Show more")
                 .font(.caption)
                 .foregroundStyle(.blue)
         }
@@ -24,5 +26,8 @@ struct ShowMoreLessButtonView: View {
 }
 
 #Preview {
-    ShowMoreLessButtonView(isPromptExpanded: .constant(true))
+    ShowMoreLessButtonView(
+        isExpanded: .constant(true),
+        action: {
+        })
 }

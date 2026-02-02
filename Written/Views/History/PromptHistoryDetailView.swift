@@ -34,8 +34,10 @@ struct PromptHistoryDetailView: View {
                             .lineLimit(isPromptExpanded ? nil : previewLineLimit)
                             .frame(maxWidth: .infinity, alignment: .trailing)
 
-                        if history.prompt.count > 100 {
-                            ShowMoreLessButtonView(isPromptExpanded: $isPromptExpanded)
+                        if history.prompt.count > 150 {
+                            ShowMoreLessButtonView(isExpanded: $isPromptExpanded) {
+                                isPromptExpanded.toggle()
+                            }
                         }
                     }
                 }
@@ -54,8 +56,10 @@ struct PromptHistoryDetailView: View {
                             .lineLimit(isResponseExpanded ? nil : previewLineLimit)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if history.response.count > 100 {
-                            ShowMoreLessButtonView(isPromptExpanded: $isPromptExpanded)
+                        if history.response.count > 150 {
+                            ShowMoreLessButtonView(isExpanded: $isResponseExpanded) {
+                                isResponseExpanded.toggle()
+                            }
                         }
                     }
                 }
