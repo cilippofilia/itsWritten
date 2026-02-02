@@ -24,6 +24,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            #if DEBUG
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
@@ -33,6 +34,7 @@ struct HistoryView: View {
                     }
                 }
             }
+            #endif
             .sheet(isPresented: $showPromptHistory) {
                 if let history = selectedHistory {
                     PromptHistoryDetailView(history: history)
@@ -79,9 +81,9 @@ struct HistoryView: View {
                     .background(.ultraThinMaterial)
                     .clipShape(.rect(cornerRadius: 12, style: .continuous))
                     .contentShape(.rect(cornerRadius: 12, style: .continuous))
-                    .listRowInsets(.init(top: 6, leading: 6, bottom: 0, trailing: 6))
                 }
                 .listRowSeparator(.hidden)
+                .listRowInsets(.init(top: 8, leading: 8, bottom: 0, trailing: 8))
             }
         }
         .listStyle(.plain)

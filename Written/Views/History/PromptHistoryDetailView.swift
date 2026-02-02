@@ -24,54 +24,59 @@ struct PromptHistoryDetailView: View {
                     .bold()
                     .padding(.bottom)
 
-                VStack(alignment: .trailing) {
-                    Text("You asked:")
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(history.prompt)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.blue.gradient)
+                        .foregroundStyle(.white)
+                        .clipShape(.rect(cornerRadius: 18))
+                        .containerRelativeFrame(.horizontal, alignment: .trailing) { size, axis in
+                            size * 0.85
+                        }
+                        .lineLimit(isPromptExpanded ? nil : previewLineLimit)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
 
-                    VStack(alignment: .trailing, spacing: 8) {
-                        Text(history.prompt)
-                            .bold()
-                            .lineLimit(isPromptExpanded ? nil : previewLineLimit)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-
-                        if history.prompt.count > 150 {
-                            ShowMoreLessButtonView(isExpanded: $isPromptExpanded) {
+                    if history.prompt.count > 120 {
+                        Button {
+                            withAnimation {
                                 isPromptExpanded.toggle()
                             }
+                        } label: {
+                            Text(isPromptExpanded ? "Show less" : "Show more")
+                                .font(.caption)
+                                .foregroundStyle(.blue)
                         }
                     }
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .trailing
-                )
-                .padding([.bottom, .leading])
 
-                VStack(alignment: .leading) {
-                    Text("The response you received:")
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(history.response)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.gray.gradient.opacity(0.3))
+                        .foregroundStyle(.primary)
+                        .clipShape(.rect(cornerRadius: 18))
+                        .containerRelativeFrame(.horizontal, alignment: .leading) { size, axis in
+                            size * 0.85
+                        }
+                        .lineLimit(isResponseExpanded ? nil : previewLineLimit)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(history.response)
-                            .lineLimit(isResponseExpanded ? nil : previewLineLimit)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if history.response.count > 150 {
-                            ShowMoreLessButtonView(isExpanded: $isResponseExpanded) {
+                    if history.response.count > 150 {
+                        Button {
+                            withAnimation {
                                 isResponseExpanded.toggle()
                             }
+                        } label: {
+                            Text(isResponseExpanded ? "Show less" : "Show more")
+                                .font(.caption)
+                                .foregroundStyle(.blue)
                         }
                     }
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
-                .padding([.bottom, .trailing])
             }
             .padding()
-
-            Spacer().frame(height: 120)
         }
     }
 }

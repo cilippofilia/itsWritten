@@ -12,7 +12,9 @@ struct HistoryModel: Codable, Hashable, Identifiable {
     let prompt: String
     let response: String
     var creationDate = Date()
+}
 
+extension HistoryModel {
     static let historyExamples: [HistoryModel] = [
         HistoryModel(
             prompt: "What is the meaning of life?",
