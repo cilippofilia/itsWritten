@@ -10,20 +10,34 @@ import SwiftUI
 struct PromptHistoryDetailView: View {
     let history: HistoryModel
 
+    @State private var isPromptExpanded = false
+    @State private var isResponseExpanded = false
+
+    private let previewLineLimit = 3
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
                 // TODO: summarize prompt with AI
                 Text("Prompt \(history.id) Summary")
-                    .font(.title2)
+                    .font(.title)
                     .bold()
-                    .padding(.vertical)
+                    .padding(.bottom)
 
                 VStack(alignment: .trailing) {
                     Text("You asked:")
                         .foregroundStyle(.secondary)
-                    Text(history.prompt)
-                        .bold()
+
+                    VStack(alignment: .trailing, spacing: 8) {
+                        Text(history.prompt)
+                            .bold()
+                            .lineLimit(isPromptExpanded ? nil : previewLineLimit)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+
+                        if history.prompt.count > 100 {
+                            ShowMoreLessButtonView(isPromptExpanded: $isPromptExpanded)
+                        }
+                    }
                 }
                 .frame(
                     maxWidth: .infinity,
@@ -32,38 +46,28 @@ struct PromptHistoryDetailView: View {
                 .padding([.bottom, .leading])
 
                 VStack(alignment: .leading) {
-                    Text("The response:")
+                    Text("The response you received:")
                         .foregroundStyle(.secondary)
-                    Text(.init(history.response))
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(history.response)
+                            .lineLimit(isResponseExpanded ? nil : previewLineLimit)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if history.response.count > 100 {
+                            ShowMoreLessButtonView(isPromptExpanded: $isPromptExpanded)
+                        }
+                    }
                 }
                 .frame(
                     maxWidth: .infinity,
                     alignment: .leading
                 )
-                .padding(.trailing)
+                .padding([.bottom, .trailing])
             }
             .padding()
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollIndicators(.hidden)
-        .mask {
-            VStack(spacing: 0) {
-                LinearGradient(
-                    colors: [.clear, .black],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 40)
 
-                Rectangle()
-
-                LinearGradient(
-                    colors: [.black, .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 40)
-            }
+            Spacer().frame(height: 120)
         }
     }
 }
