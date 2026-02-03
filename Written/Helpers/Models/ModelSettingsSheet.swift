@@ -22,9 +22,13 @@ struct ModelSettingsSheet: View {
     var body: some View {
         Form {
             Section {
-                TextField("Instructions", text: $configuration.instructions, axis: .vertical)
-                    .lineLimit(3...6)
-                    .labelsHidden()
+                TextField(
+                    "Instructions",
+                    text: $configuration.instructions,
+                    axis: .vertical
+                )
+                .lineLimit(12, reservesSpace: true)
+                .labelsHidden()
             } header: {
                 Text("Instructions")
                     .padding(.top)

@@ -1,5 +1,5 @@
 //
-//  PromptHistoryDetailView.swift
+//  ChatDetailView.swift
 //  Written
 //
 //  Created by Filippo Cilia on 28/01/2026.
@@ -7,35 +7,24 @@
 
 import SwiftUI
 
-struct PromptHistoryDetailView: View {
-    let history: HistoryModel
+struct ChatDetailView: View {
+    let history: ChatModel
 
     @State private var isPromptExpanded = false
-    @State private var isResponseExpanded = false
-
-    private let previewLineLimit = 3
+    @State private var isResponseExpanded = true
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                // TODO: summarize prompt with AI
-                Text("Prompt \(history.id) Summary")
+                Text(history.title)
                     .font(.title)
                     .bold()
                     .padding(.bottom)
 
                 VStack(alignment: .trailing, spacing: 8) {
                     Text(history.prompt)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.blue.gradient)
-                        .foregroundStyle(.white)
-                        .clipShape(.rect(cornerRadius: 18))
-                        .containerRelativeFrame(.horizontal, alignment: .trailing) { size, axis in
-                            size * 0.85
-                        }
-                        .lineLimit(isPromptExpanded ? nil : previewLineLimit)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .lineLimit(isPromptExpanded ? nil : 3)
+                        .promptBubble()
 
                     if history.prompt.count > 120 {
                         Button {
@@ -52,16 +41,8 @@ struct PromptHistoryDetailView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(history.response)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.gray.gradient.opacity(0.3))
-                        .foregroundStyle(.primary)
-                        .clipShape(.rect(cornerRadius: 18))
-                        .containerRelativeFrame(.horizontal, alignment: .leading) { size, axis in
-                            size * 0.85
-                        }
-                        .lineLimit(isResponseExpanded ? nil : previewLineLimit)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(isResponseExpanded ? nil : 6)
+                        .responseBubble()
 
                     if history.response.count > 150 {
                         Button {
@@ -77,10 +58,11 @@ struct PromptHistoryDetailView: View {
                 }
             }
             .padding()
+            .padding(.vertical)
         }
     }
 }
 
 #Preview {
-    PromptHistoryDetailView(history: .historyExamples.first!)
+    ChatDetailView(history: .chatExamples.first!)
 }

@@ -20,6 +20,7 @@ struct HomeContentView: View {
 
     @Binding var shouldSend: Bool
 
+    let config: ModelConfiguration
     let session: LanguageModelSession
 
     var body: some View {
@@ -80,9 +81,10 @@ extension HomeContentView {
     @MainActor
     private func performSend() async {
         showOverlayView = true
+        defer { showOverlayView = false }
 
-        let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !input.isEmpty else {
+        let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else {
             showOverlayView = false
             return
         }
@@ -91,9 +93,10 @@ extension HomeContentView {
         activeAlert = nil
 
         do {
-            let answer = try await streamResponse(from: session, input: input)
-            let history = HistoryModel(prompt: input, response: .init(answer))
-            viewModel.history.append(history)
+            let title = try await generateTitle(from: prompt)
+            let answer = try await streamResponse(from: session, input: prompt, title: title)
+            let chat = ChatModel(title: .init(title), prompt: prompt, response: .init(answer))
+            viewModel.chatHistory.append(chat)
             text = ""
         } catch let error as LanguageModelSession.GenerationError {
             activeAlert = createAlert(from: error)
@@ -103,26 +106,66 @@ extension HomeContentView {
                 message: error.localizedDescription
             )
         }
+    }
 
-        showOverlayView = false
+    @MainActor
+    private func generateTitle(from input: String) async throws -> String {
+        let titleSession = LanguageModelSession(instructions: "Summarize the prompt in a few words withot changing the overall meaning of it. Please return the summarized title directly.")
+        var title = ""
+        for try await partial in titleSession.streamResponse(to: input) {
+            title = partial.content
+        }
+
+        return title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     @MainActor
     private func streamResponse(
         from session: LanguageModelSession,
-        input: String
+        input: String,
+        title: String
     ) async throws -> String {
         // Compact the session before sending if transcript is getting large
         let compactedSession = compactedSession(from: session)
-        let stream = compactedSession.streamResponse(to: input)
+        let stream = compactedSession.streamResponse(to: input, options: config.generationOptions)
         var fullAnswer = ""
 
         for try await partial in stream {
             fullAnswer = partial.content
-            presentedSheet = .aiGeneratedAnswer(partial.content)
+            presentedSheet = .chat(title: title, prompt: input, answer: fullAnswer)
         }
 
         return fullAnswer
+    }
+
+    private func compactedSession(
+        from previousSession: LanguageModelSession,
+        maxCharacters: Int = 4000
+    ) -> LanguageModelSession {
+        let entries = previousSession.transcript
+        // Bail out if there's nothing to compact
+        guard let first = entries.first else { return previousSession }
+
+        var selected = [first]
+        var totalInstructionLength = String(describing: first).count
+        var recentEntries: [Transcript.Entry] = []
+
+        // Count backwards, because the most recent entries
+        // are the most relevant ones to the user.
+        for entry in entries.dropFirst().reversed() {
+            let entryEstimatelength = String(describing: entry).count
+            // Bail out if adding this would push us over our limit.
+            guard totalInstructionLength + entryEstimatelength <= maxCharacters else { break }
+            // Add this to the *start* of recentEntries,
+            // because we're working backwards.
+            recentEntries.insert(entry, at: 0)
+            // Add its length to our length tracker.
+            totalInstructionLength += entryEstimatelength
+        }
+        selected.append(contentsOf: recentEntries)
+
+        // Return new session from the compacted transcript.
+        return LanguageModelSession(transcript: Transcript(entries: selected))
     }
 
     @MainActor
@@ -153,42 +196,15 @@ extension HomeContentView {
 
         return .aiGeneration(title: title, message: message)
     }
-
-    private func compactedSession(
-        from previousSession: LanguageModelSession,
-        maxCharacters: Int = 4000
-    ) -> LanguageModelSession {
-        let entries = previousSession.transcript
-        // Bail out if there's nothing to compact
-        guard let first = entries.first else { return previousSession }
-        var selected = [first]
-        var totalInstructionLength = String(describing: first).count
-        var recentEntries: [Transcript.Entry] = []
-
-        // Count backwards, because the most recent entries
-        // are the most relevant ones to the user.
-        for entry in entries.dropFirst().reversed() {
-            let entryEstimatelength = String(describing: entry).count
-            // Bail out if adding this would push us over our limit.
-            guard totalInstructionLength + entryEstimatelength <= maxCharacters else { break }
-            // Add this to the *start* of recentEntries,
-            // because we're working backwards.
-            recentEntries.insert(entry, at: 0)
-            // Add its length to our length tracker.
-            totalInstructionLength += entryEstimatelength
-        }
-        selected.append(contentsOf: recentEntries)
-
-        // Return new session from the compacted transcript.
-        return LanguageModelSession(transcript: Transcript(entries: selected))
-    }
 }
 
 #Preview {
     HomeContentView(
         shouldSend: .constant(false),
+        config: ModelConfiguration(),
         session: LanguageModelSession()
     )
     .environment(HomeViewModel())
     .environment(CountdownViewModel())
 }
+

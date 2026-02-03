@@ -12,7 +12,7 @@ import SwiftUI
 @Observable
 public class HomeViewModel {
     var placeholderText: String = ""
-    var history: [HistoryModel] = []
+    var chatHistory: [ChatModel] = []
 
     init() {
         setRandomPlaceholderText()

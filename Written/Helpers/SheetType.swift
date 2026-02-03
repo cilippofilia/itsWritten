@@ -10,7 +10,7 @@ import SwiftUI
 enum SheetType: Identifiable, Equatable {
     case whyAI
     case languageSupport
-    case aiGeneratedAnswer(String)
+    case chat(title: String, prompt: String, answer: String)
     case settings(Binding<ModelConfiguration>)
 
     var id: String {
@@ -19,8 +19,8 @@ enum SheetType: Identifiable, Equatable {
             return "whyAI"
         case .languageSupport:
             return "languageSupport"
-        case .aiGeneratedAnswer:
-            return "aiGeneratedAnswer"
+        case .chat:
+            return "chat"
         case .settings:
             return "settings"
         }
@@ -42,8 +42,8 @@ enum SheetType: Identifiable, Equatable {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
 
-        case .aiGeneratedAnswer(let answer):
-            AIGeneratedAnswerSheet(answer: answer)
+        case .chat(let title, let prompt, let answer):
+            ChatSheet(title: title, prompt: prompt, answer: answer)
                 .background(.ultraThinMaterial)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
