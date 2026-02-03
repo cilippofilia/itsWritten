@@ -10,7 +10,7 @@ import SwiftUI
 struct MenuButtonView: View {
     @Binding var showWhyAISheet: Bool
     @Binding var showLanguageSupportSheet: Bool
-    @Binding var showHistoryView: Bool
+    @Binding var showChatHistoryView: Bool
     @Binding var showSettings: Bool
 
     var body: some View {
@@ -19,7 +19,7 @@ struct MenuButtonView: View {
             Label("Onboarding", systemImage: "book.pages")
 
             Button(action: {
-                showHistoryView = true
+                showChatHistoryView = true
             }) {
                 Label("History", systemImage: "clock.arrow.circlepath")
             }
@@ -60,7 +60,7 @@ struct MenuButtonView: View {
     MenuButtonView(
         showWhyAISheet: .constant(false),
         showLanguageSupportSheet: .constant(false),
-        showHistoryView: .constant(false),
+        showChatHistoryView: .constant(false),
         showSettings: .constant(false)
     )
 }

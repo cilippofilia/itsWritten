@@ -1,5 +1,5 @@
 //
-//  AIGeneratedAnswerSheet.swift
+//  ChatSheet.swift
 //  Written
 //
 //  Created by Filippo Cilia on 01/02/2026.
@@ -7,24 +7,22 @@
 
 import SwiftUI
 
-struct AIGeneratedAnswerSheet: View {
+struct ChatSheet: View {
     @Environment(HomeViewModel.self) private var viewModel
 
+    let title: String
+    let prompt: String
     let answer: String
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
-            Text(.init(answer))
-                .padding()
-                .foregroundStyle(.primary)
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .leading
+            ChatDetailView(
+                history: ChatModel(
+                    title: title,
+                    prompt: prompt,
+                    response: answer
                 )
-                .ignoresSafeArea()
-                .padding(.vertical)
+            )
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollIndicators(.hidden)
@@ -35,7 +33,7 @@ struct AIGeneratedAnswerSheet: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 40)
+                .frame(height: 30)
 
                 Rectangle()
 
@@ -44,13 +42,13 @@ struct AIGeneratedAnswerSheet: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 40)
+                .frame(height: 30)
             }
         }
     }
 }
 
 #Preview {
-    AIGeneratedAnswerSheet(answer: loremIpsum)
+    ChatSheet(title: "Test title a bit long", prompt: "test prompt?", answer: loremIpsum)
         .environment(HomeViewModel())
 }

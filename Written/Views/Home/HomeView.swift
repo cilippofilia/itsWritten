@@ -15,13 +15,14 @@ struct HomeView: View {
     @State private var config = ModelConfiguration()
     @State private var presentedSheet: SheetType?
     @State private var session = LanguageModelSession()
-    @State private var showHistoryView = false
+    @State private var showChatHistoryView = false
     @State private var shouldSend = false
 
     var body: some View {
         NavigationStack {
             HomeContentView(
                 shouldSend: $shouldSend,
+                config: config,
                 session: session
             )
             .toolbar {
@@ -32,8 +33,12 @@ struct HomeView: View {
             .sheet(item: $presentedSheet) { sheet in
                 sheet.view
             }
-            .navigationDestination(isPresented: $showHistoryView) {
-                HistoryView()
+            .onAppear {
+                session.prewarm(promptPrefix: .init(config.instructions))
+                session = LanguageModelSession(instructions: config.instructions)
+            }
+            .navigationDestination(isPresented: $showChatHistoryView) {
+                ChatHistoryView()
             }
         }
     }
@@ -49,7 +54,7 @@ struct HomeView: View {
                     get: { presentedSheet == .languageSupport },
                     set: { if $0 { presentedSheet = .languageSupport } else { presentedSheet = nil } }
                 ),
-                showHistoryView: $showHistoryView,
+                showChatHistoryView: $showChatHistoryView,
                 showSettings: .init(
                     get: { presentedSheet == .settings($config) },
                     set: { if $0 { presentedSheet = .settings($config) } else { presentedSheet = nil } }
