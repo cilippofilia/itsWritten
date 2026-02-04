@@ -38,13 +38,11 @@ struct MenuButtonView: View {
                 Label("Why AI?", systemImage: "sparkles")
             }
 
-            #if DEBUG
             Divider()
 
             Button("Settings", systemImage: "gearshape") {
                 showSettings = true
             }
-            #endif
         } label: {
             Label("Menu", systemImage: "line.3.horizontal")
                 .labelStyle(.iconOnly)

@@ -22,7 +22,7 @@ struct HomeView: View {
         NavigationStack {
             HomeContentView(
                 shouldSend: $shouldSend,
-                config: config,
+                config: $config,
                 session: session
             )
             .toolbar {
@@ -34,11 +34,11 @@ struct HomeView: View {
                 sheet.view
             }
             .onAppear {
-                session.prewarm(promptPrefix: .init(config.instructions))
                 session = LanguageModelSession(instructions: config.instructions)
+                session.prewarm(promptPrefix: .init(config.instructions))
             }
             .navigationDestination(isPresented: $showChatHistoryView) {
-                ChatHistoryView()
+                ChatHistoryView(config: $config)
             }
         }
     }
