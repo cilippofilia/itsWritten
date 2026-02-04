@@ -7,12 +7,7 @@
 
 import SwiftUI
 
-/// An animated indicator showing that the AI is typing a response.
-///
-/// Displays an ellipsis icon with a variable color animation effect to indicate
-/// that a response is being generated.
 struct TypingIndicator: View {
-    /// Whether the dots animation is active.
     @State private var animatingDots = false
 
     var body: some View {
@@ -20,10 +15,10 @@ struct TypingIndicator: View {
             Image(systemName: "ellipsis")
                 .symbolEffect(.variableColor, isActive: animatingDots)
                 .font(.title)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .bold()
+                .padding()
                 .background(Color.secondary.opacity(0.2))
-                .clipShape(.rect(cornerRadius: 16))
+                .clipShape(.capsule)
 
             Spacer(minLength: 60)
         }

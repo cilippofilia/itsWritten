@@ -11,6 +11,8 @@ import SwiftUI
 struct ChatView: View {
     @Environment(HomeViewModel.self) private var viewModel
 
+    @Binding var configuration: ModelConfiguration
+
     @State private var session: LanguageModelSession
     @State private var messages: [ChatMessage]
     @State private var input = ""
@@ -20,7 +22,6 @@ struct ChatView: View {
     @State private var responseType = ModelResponseType.standard
     @State private var threadId: UUID?
 
-    @Binding var configuration: ModelConfiguration
     let title: String
     let seedPrompt: String?
 
@@ -42,6 +43,15 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Text(title)
+                .font(.title2)
+                .bold()
+                .padding()
+                .padding(.top)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.leading)
+                .lineLimit(3)
+
             MessageListView(messages: messages, isResponding: isResponding)
 
             PromptInputView(
@@ -53,18 +63,6 @@ struct ChatView: View {
             .padding()
             .background(.bar)
         }
-        .navigationTitle(title)
-        .toolbar {
-            Button("Settings", systemImage: "gearshape") {
-                showingSettings = true
-            }
-        }
-//        .sheet(isPresented: $showingSettings) {
-//            ModelSettingsSheet(
-//                configuration: $configuration,
-//                responseType: $responseType
-//            )
-//        }
         .onChange(of: configuration.instructions) {
             if configuration.instructions.isReallyEmpty {
                 session = LanguageModelSession()
@@ -84,6 +82,7 @@ struct ChatView: View {
     ///
     /// This method dispatches to the appropriate generation strategy based on the
     /// current `responseType` setting.
+    @MainActor
     func sendMessage() {
         guard input.isReallyEmpty == false else { return }
 
@@ -105,6 +104,7 @@ struct ChatView: View {
     /// The entire response is generated before being displayed. Handles context window
     /// overflow by compacting the session and retrying.
     /// - Parameter prompt: The user's message to respond to.
+    @MainActor
     func generateStandardResponse(for prompt: String) async {
         isResponding = true
         defer { isResponding = false }
@@ -130,6 +130,7 @@ struct ChatView: View {
     /// Creates an empty message placeholder that updates in real-time as the
     /// response is generated. Handles context window overflow by compacting and retrying.
     /// - Parameter prompt: The user's message to respond to.
+    @MainActor
     func generateStreamingResponse(for prompt: String) async {
         isResponding = true
         defer { isResponding = false }
@@ -187,6 +188,7 @@ struct ChatView: View {
     /// creating a more natural conversational feel. The response is generated in the
     /// background while initial "thinking" time passes.
     /// - Parameter prompt: The user's message to respond to.
+    @MainActor
     func generateHumanResponse(for prompt: String) async {
         let startTime = ContinuousClock.now
 
@@ -212,10 +214,12 @@ struct ChatView: View {
     }
 
     /// Appends a standard error message to the conversation.
+    @MainActor
     func appendErrorMessage() {
         messages.append(ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false))
     }
 
+    @MainActor
     private func seedConversationIfNeeded() {
         guard hasSeeded == false, let prompt = seedPrompt, messages.isEmpty else { return }
         hasSeeded = true
@@ -225,6 +229,7 @@ struct ChatView: View {
         }
     }
 
+    @MainActor
     private func saveThreadOnDismiss() {
         guard messages.isEmpty == false else { return }
 

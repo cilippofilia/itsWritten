@@ -7,15 +7,8 @@
 
 import SwiftUI
 
-/// Displays the scrollable list of chat messages with automatic scrolling.
-///
-/// This view automatically scrolls to show new messages and displays a typing
-/// indicator when the AI is generating a response.
 struct MessageListView: View {
-    /// The array of chat messages to display.
     let messages: [ChatMessage]
-
-    /// Whether the AI is currently generating a response.
     let isResponding: Bool
 
     var body: some View {

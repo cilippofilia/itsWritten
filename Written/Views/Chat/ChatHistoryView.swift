@@ -67,7 +67,7 @@ struct ChatHistoryView: View {
                         Text(thread.title)
                             .bold()
 
-                        Text(thread.messages.last?.content ?? "")
+                        Text(firstUserPrompt(in: thread) ?? "")
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -108,6 +108,10 @@ struct ChatHistoryView: View {
         }
 
         return LanguageModelSession(transcript: Transcript(entries: entries))
+    }
+
+    private func firstUserPrompt(in thread: ChatThread) -> String? {
+        thread.messages.first(where: { $0.isUser })?.content
     }
 }
 
