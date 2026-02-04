@@ -32,6 +32,11 @@ struct ModelSettingsSheet: View {
             } header: {
                 Text("Instructions")
                     .padding(.top)
+            } footer: {
+                VStack(alignment: .leading) {
+                    Text("⚠️ DO NOT DELETE THESE INSTRUCTIONS.⚠️")
+                    Text("Feel free to modify and refine them as needed. If you find better responses with different settings please share them with me.\nLots of love, Filippo")
+                }
             }
 
             Section("Response") {

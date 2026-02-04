@@ -24,17 +24,6 @@ struct ChatHistoryView: View {
                 }
             }
             .navigationTitle("History")
-            #if DEBUG
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        viewModel.chatThreads.append(contentsOf: ChatThread.sampleThreads)
-                    }) {
-                        Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
-                    }
-                }
-            }
-            #endif
             .sheet(item: $presentedSheet) { sheet in
                 sheet.view
             }
@@ -42,11 +31,17 @@ struct ChatHistoryView: View {
     }
 
     var unavailableView: some View {
-        ContentUnavailableView(
-            "No History",
-            systemImage: "clock.arrow.circlepath",
-            description: Text("Your conversation history will appear here")
-        )
+        ContentUnavailableView {
+            Label("No History", systemImage: "bubble.left.and.exclamationmark.bubble.right")
+        } description: {
+            Text("You don't have any conversation history yet")
+        } actions: {
+            Button(action: {
+                viewModel.chatThreads.append(contentsOf: ChatThread.sampleThreads)
+            }) {
+                Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
+            }
+        }
     }
 
     var availableView: some View {
