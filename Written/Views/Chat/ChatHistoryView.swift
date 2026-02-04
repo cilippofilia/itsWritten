@@ -5,19 +5,19 @@
 //  Created by Filippo Cilia on 28/01/2026.
 //
 
+import FoundationModels
 import SwiftUI
 
 struct ChatHistoryView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(HomeViewModel.self) private var viewModel
-    
-    @State private var showPromptHistory: Bool = false
-    @State private var selectedHistory: ChatModel?
+
+    @Binding var config: ModelConfiguration
+    @State private var presentedSheet: SheetType?
 
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.chatHistory.isEmpty {
+                if viewModel.chatThreads.isEmpty {
                     unavailableView
                 } else {
                     availableView
@@ -28,19 +28,15 @@ struct ChatHistoryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
-                        viewModel.chatHistory.append(contentsOf: ChatModel.chatExamples)
+                        viewModel.chatThreads.append(contentsOf: ChatThread.sampleThreads)
                     }) {
                         Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
                     }
                 }
             }
             #endif
-            .sheet(isPresented: $showPromptHistory) {
-                if let history = selectedHistory {
-                    ChatDetailView(history: history)
-                        .presentationDetents([.medium, .large])
-                        .presentationDragIndicator(.visible)
-                }
+            .sheet(item: $presentedSheet) { sheet in
+                sheet.view
             }
         }
     }
@@ -55,27 +51,26 @@ struct ChatHistoryView: View {
 
     var availableView: some View {
         List {
-            ForEach(viewModel.chatHistory.reversed()) { convo in
+            ForEach(viewModel.chatThreads.reversed()) { thread in
                 Button(action: {
-                    selectedHistory = convo
-                    showPromptHistory = true
+                    let session = buildSession(for: thread)
+                    presentedSheet = .chatV2(
+                        title: thread.title,
+                        seedPrompt: nil,
+                        session: session,
+                        config: $config,
+                        threadId: thread.id,
+                        initialMessages: thread.messages
+                    )
                 }) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Prompt \(convo.id)")
+                        Text(thread.title)
                             .bold()
 
-                        Group {
-                            Text(convo.prompt)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                .bold()
-                                .padding(.leading)
-
-                            Text(convo.response)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.trailing)
-                        }
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        Text(thread.messages.last?.content ?? "")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
                     .padding()
                     .background(.ultraThinMaterial)
@@ -88,9 +83,35 @@ struct ChatHistoryView: View {
         }
         .listStyle(.plain)
     }
+
+    private func buildSession(for thread: ChatThread) -> LanguageModelSession {
+        var entries: [Transcript.Entry] = []
+
+        if config.instructions.isReallyEmpty == false {
+            let instructionSegment = Transcript.Segment.text(.init(content: config.instructions))
+            let instructions = Transcript.Instructions(
+                segments: [instructionSegment],
+                toolDefinitions: []
+            )
+            entries.append(.instructions(instructions))
+        }
+
+        for message in thread.messages {
+            let segment = Transcript.Segment.text(.init(content: message.content))
+            if message.isUser {
+                let prompt = Transcript.Prompt(segments: [segment])
+                entries.append(.prompt(prompt))
+            } else {
+                let response = Transcript.Response(assetIDs: [], segments: [segment])
+                entries.append(.response(response))
+            }
+        }
+
+        return LanguageModelSession(transcript: Transcript(entries: entries))
+    }
 }
 
 #Preview {
-    ChatHistoryView()
+    ChatHistoryView(config: .constant(ModelConfiguration()))
         .environment(HomeViewModel())
 }

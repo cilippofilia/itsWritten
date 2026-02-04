@@ -20,7 +20,7 @@ struct HomeContentView: View {
 
     @Binding var shouldSend: Bool
 
-    let config: ModelConfiguration
+    @Binding var config: ModelConfiguration
     let session: LanguageModelSession
 
     var body: some View {
@@ -94,9 +94,14 @@ extension HomeContentView {
 
         do {
             let title = try await generateTitle(from: prompt)
-            let answer = try await streamResponse(from: session, input: prompt, title: title)
-            let chat = ChatModel(title: .init(title), prompt: prompt, response: .init(answer))
-            viewModel.chatHistory.append(chat)
+            presentedSheet = .chatV2(
+                title: title,
+                seedPrompt: prompt,
+                session: session,
+                config: $config,
+                threadId: nil,
+                initialMessages: []
+            )
             text = ""
         } catch let error as LanguageModelSession.GenerationError {
             activeAlert = createAlert(from: error)
@@ -117,25 +122,6 @@ extension HomeContentView {
         }
 
         return title.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    @MainActor
-    private func streamResponse(
-        from session: LanguageModelSession,
-        input: String,
-        title: String
-    ) async throws -> String {
-        // Compact the session before sending if transcript is getting large
-        let compactedSession = session.compactedSession(from: session)
-        let stream = compactedSession.streamResponse(to: input, options: config.generationOptions)
-        var fullAnswer = ""
-
-        for try await partial in stream {
-            fullAnswer = partial.content
-            presentedSheet = .chat(title: title, prompt: input, answer: fullAnswer)
-        }
-
-        return fullAnswer
     }
 
     @MainActor
@@ -171,10 +157,9 @@ extension HomeContentView {
 #Preview {
     HomeContentView(
         shouldSend: .constant(false),
-        config: ModelConfiguration(),
+        config: .constant(ModelConfiguration()),
         session: LanguageModelSession()
     )
     .environment(HomeViewModel())
     .environment(CountdownViewModel())
 }
-

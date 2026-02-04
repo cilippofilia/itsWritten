@@ -16,11 +16,18 @@ struct ChatModel: Codable, Hashable, Identifiable {
 }
 
 /// Represents a single message in a chat conversation.
-struct ChatMessage: Equatable, Identifiable {
-    let id = UUID()
+struct ChatMessage: Codable, Hashable, Identifiable {
+    let id: UUID
     let content: String
     let isUser: Bool
-    let timestamp = Date.now
+    let timestamp: Date
+
+    init(id: UUID = UUID(), content: String, isUser: Bool, timestamp: Date = .now) {
+        self.id = id
+        self.content = content
+        self.isUser = isUser
+        self.timestamp = timestamp
+    }
 }
 
 /// The type of response generation to use.

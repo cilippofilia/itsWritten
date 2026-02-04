@@ -8,33 +8,37 @@
 import FoundationModels
 import SwiftUI
 
-/// A chat interface demonstrating various response generation strategies.
-///
-/// This view provides a full chat experience with support for standard responses,
-/// streaming responses, and simulated "human-like" typing delays.
 struct ChatView: View {
-    /// The language model session managing conversation state.
-    @State private var session = LanguageModelSession()
+    @Environment(HomeViewModel.self) private var viewModel
 
-    /// The array of chat messages displayed in the conversation.
-    @State private var messages = [ChatMessage]()
-
-    /// The current user input text.
+    @State private var session: LanguageModelSession
+    @State private var messages: [ChatMessage]
     @State private var input = ""
-
-    /// Whether the model is currently generating a response.
-    /// This is important because we have "human" response mode,
-    /// where we fake a delay in thinking and typing.
     @State private var isResponding = false
-
-    /// Controls whether the settings sheet is presented.
     @State private var showingSettings = false
-
-    /// The configuration for the language model.
-    @State private var configuration = ModelConfiguration()
-
-    /// The selected response generation strategy.
+    @State private var hasSeeded = false
     @State private var responseType = ModelResponseType.standard
+    @State private var threadId: UUID?
+
+    @Binding var configuration: ModelConfiguration
+    let title: String
+    let seedPrompt: String?
+
+    init(
+        title: String,
+        seedPrompt: String?,
+        session: LanguageModelSession,
+        configuration: Binding<ModelConfiguration>,
+        threadId: UUID?,
+        initialMessages: [ChatMessage]
+    ) {
+        self.title = title
+        self.seedPrompt = seedPrompt
+        self._configuration = configuration
+        self._session = State(initialValue: session)
+        self._messages = State(initialValue: initialMessages)
+        self._threadId = State(initialValue: threadId)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,30 +46,37 @@ struct ChatView: View {
 
             PromptInputView(
                 text: $input,
-                placeholder: "Message",
+                placeholder: viewModel.placeholderText,
                 isDisabled: isResponding,
                 onSubmit: sendMessage
             )
             .padding()
             .background(.bar)
         }
+        .navigationTitle(title)
         .toolbar {
             Button("Settings", systemImage: "gearshape") {
                 showingSettings = true
             }
         }
-        .sheet(isPresented: $showingSettings) {
-            ModelSettingsSheet(
-                configuration: $configuration,
-                responseType: $responseType
-            )
-        }
+//        .sheet(isPresented: $showingSettings) {
+//            ModelSettingsSheet(
+//                configuration: $configuration,
+//                responseType: $responseType
+//            )
+//        }
         .onChange(of: configuration.instructions) {
             if configuration.instructions.isReallyEmpty {
                 session = LanguageModelSession()
             } else {
                 session = LanguageModelSession(instructions: configuration.instructions)
             }
+        }
+        .onAppear {
+            seedConversationIfNeeded()
+        }
+        .onDisappear {
+            saveThreadOnDismiss()
         }
     }
 
@@ -120,24 +131,53 @@ struct ChatView: View {
     /// response is generated. Handles context window overflow by compacting and retrying.
     /// - Parameter prompt: The user's message to respond to.
     func generateStreamingResponse(for prompt: String) async {
+        isResponding = true
+        defer { isResponding = false }
+
         let messageIndex = messages.count
         messages.append(ChatMessage(content: "", isUser: false))
+        let messageId = messages[messageIndex].id
+        let timestamp = messages[messageIndex].timestamp
 
         do {
             for try await partial in session.streamResponse(to: prompt, options: configuration.generationOptions) {
-                messages[messageIndex] = ChatMessage(content: partial.content, isUser: false)
+                withAnimation(.default) {
+                    messages[messageIndex] = ChatMessage(
+                        id: messageId,
+                        content: partial.content,
+                        isUser: false,
+                        timestamp: timestamp
+                    )
+                }
             }
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             session = session.compactedSession(from: session)
             do {
                 for try await partial in session.streamResponse(to: prompt, options: configuration.generationOptions) {
-                    messages[messageIndex] = ChatMessage(content: partial.content, isUser: false)
+                    withAnimation(.default) {
+                        messages[messageIndex] = ChatMessage(
+                            id: messageId,
+                            content: partial.content,
+                            isUser: false,
+                            timestamp: timestamp
+                        )
+                    }
                 }
             } catch {
-                messages[messageIndex] = ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false)
+                messages[messageIndex] = ChatMessage(
+                    id: messageId,
+                    content: "Sorry, I couldn't generate a response.",
+                    isUser: false,
+                    timestamp: timestamp
+                )
             }
         } catch {
-            messages[messageIndex] = ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false)
+            messages[messageIndex] = ChatMessage(
+                id: messageId,
+                content: "Sorry, I couldn't generate a response.",
+                isUser: false,
+                timestamp: timestamp
+            )
         }
     }
 
@@ -175,10 +215,50 @@ struct ChatView: View {
     func appendErrorMessage() {
         messages.append(ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false))
     }
+
+    private func seedConversationIfNeeded() {
+        guard hasSeeded == false, let prompt = seedPrompt, messages.isEmpty else { return }
+        hasSeeded = true
+        messages.append(ChatMessage(content: prompt, isUser: true))
+        Task {
+            await generateStreamingResponse(for: prompt)
+        }
+    }
+
+    private func saveThreadOnDismiss() {
+        guard messages.isEmpty == false else { return }
+
+        var messagesToSave = messages
+        if isResponding, let last = messagesToSave.last, last.isUser == false {
+            messagesToSave.removeLast()
+        }
+
+        guard messagesToSave.isEmpty == false else { return }
+
+        let id = threadId ?? UUID()
+        threadId = id
+        let existing = viewModel.chatThreads.first(where: { $0.id == id })
+        let thread = ChatThread(
+            id: id,
+            title: title,
+            messages: messagesToSave,
+            creationDate: existing?.creationDate ?? Date(),
+            lastUpdated: Date()
+        )
+        viewModel.upsertThread(thread)
+    }
 }
 
 #Preview {
     NavigationStack {
-        ChatView()
+        ChatView(
+            title: "Preview",
+            seedPrompt: nil,
+            session: LanguageModelSession(),
+            configuration: .constant(ModelConfiguration()),
+            threadId: nil,
+            initialMessages: []
+        )
     }
+    .environment(HomeViewModel())
 }

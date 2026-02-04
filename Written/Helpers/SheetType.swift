@@ -5,11 +5,21 @@
 //  Created by Filippo Cilia on 01/02/2026.
 //
 
+import Foundation
+import FoundationModels
 import SwiftUI
 
 enum SheetType: Identifiable, Equatable {
     case whyAI
     case languageSupport
+    case chatV2(
+        title: String,
+        seedPrompt: String?,
+        session: LanguageModelSession,
+        config: Binding<ModelConfiguration>,
+        threadId: UUID?,
+        initialMessages: [ChatMessage]
+    )
     case chat(title: String, prompt: String, answer: String)
     case settings(Binding<ModelConfiguration>)
 
@@ -21,6 +31,8 @@ enum SheetType: Identifiable, Equatable {
             return "languageSupport"
         case .chat:
             return "chat"
+        case .chatV2:
+            return "chatV2"
         case .settings:
             return "settings"
         }
@@ -48,6 +60,27 @@ enum SheetType: Identifiable, Equatable {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
 
+        case .chatV2(
+            let title,
+            let seedPrompt,
+            let session,
+            let config,
+            let threadId,
+            let initialMessages
+        ):
+            NavigationStack {
+                ChatView(
+                    title: title,
+                    seedPrompt: seedPrompt,
+                    session: session,
+                    configuration: config,
+                    threadId: threadId,
+                    initialMessages: initialMessages
+                )
+            }
+            .background(.ultraThinMaterial)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         case .settings(let config):
             ModelSettingsSheet(configuration: config)
                 .background(.ultraThinMaterial)
