@@ -18,16 +18,21 @@ struct MessageBubble: View {
     var body: some View {
         let alignment = message.isUser ? Alignment.trailing : .leading
 
-        Text(message.content)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(message.isUser ? Color.blue : .gray.opacity(0.2))
-            .foregroundStyle(message.isUser ? .white : .primary)
-            .clipShape(.rect(cornerRadius: 18))
-            .containerRelativeFrame(.horizontal, alignment: alignment) { size, axis in
-                size * 0.75
-            }
-            .frame(maxWidth: .infinity, alignment: alignment)
+        ExpandableText(
+            text: message.content,
+            lineLimit: 3,
+            threshold: 180,
+            isUser: message.isUser
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(message.isUser ? Color.blue : .gray.opacity(0.2))
+        .foregroundStyle(message.isUser ? .white : .primary)
+        .clipShape(.rect(cornerRadius: 18))
+        .containerRelativeFrame(.horizontal, alignment: alignment) { size, axis in
+            size * 0.75
+        }
+        .frame(maxWidth: .infinity, alignment: alignment)
     }
 }
 
