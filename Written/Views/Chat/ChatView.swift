@@ -7,9 +7,11 @@
 
 import FoundationModels
 import SwiftUI
+import SwiftData
 
 struct ChatView: View {
     @Environment(HomeViewModel.self) private var viewModel
+    @Environment(\.modelContext) private var modelContext
 
     @Binding var configuration: ModelConfiguration
 
@@ -242,15 +244,25 @@ struct ChatView: View {
 
         let id = threadId ?? UUID()
         threadId = id
-        let existing = viewModel.chatThreads.first(where: { $0.id == id })
-        let thread = ChatThread(
-            id: id,
-            title: title,
-            messages: messagesToSave,
-            creationDate: existing?.creationDate ?? Date(),
-            lastUpdated: Date()
+        let fetch = FetchDescriptor<ChatThread>(
+            predicate: #Predicate { $0.id == id }
         )
-        viewModel.upsertThread(thread)
+        let existing = (try? modelContext.fetch(fetch))?.first
+        if let existing {
+            existing.title = title
+            existing.messages = messagesToSave
+            existing.lastUpdated = Date()
+        } else {
+            let thread = ChatThread(
+                id: id,
+                title: title,
+                messages: messagesToSave,
+                creationDate: Date(),
+                lastUpdated: Date()
+            )
+            modelContext.insert(thread)
+        }
+        try? modelContext.save()
     }
 }
 
@@ -266,4 +278,5 @@ struct ChatView: View {
         )
     }
     .environment(HomeViewModel())
+    .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

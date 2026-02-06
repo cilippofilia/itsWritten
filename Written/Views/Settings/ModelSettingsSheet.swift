@@ -35,11 +35,11 @@ struct ModelSettingsSheet: View {
             } footer: {
                 VStack(alignment: .leading) {
                     Text("⚠️ DO NOT DELETE THESE INSTRUCTIONS.⚠️")
-                    Text("Feel free to modify and refine them as needed. If you find better responses with different settings please share them with me.\nLots of love, Filippo")
+                    Text("Feel free to modify and refine them as needed. If you find better responses with different settings please share them with me.\n\nLots of love, Filippo")
                 }
             }
 
-            Section("Response") {
+            Section {
                 LabeledContent("Temperature: \(configuration.temperature, format: .number.precision(.fractionLength(2)))") {
                     Slider(value: $configuration.temperature, in: 0...1)
                 }
@@ -52,9 +52,13 @@ struct ModelSettingsSheet: View {
                     }
                     .pickerStyle(.segmented)
                 }
+            } header: {
+                Text("Response")
+            } footer: {
+                Text("Temperature: Controls response randomness where 0 is random, 1 is deterministic.")
             }
 
-            Section("Sampling") {
+            Section {
                 Picker("Method", selection: $configuration.samplingType) {
                     ForEach(ModelSamplingType.allCases) { type in
                         Text(type.rawValue).tag(type)
@@ -73,6 +77,14 @@ struct ModelSettingsSheet: View {
                         Slider(value: $configuration.topP, in: 0...1)
                     }
                 }
+            } header: {
+                Text("Sampling")
+            } footer: {
+                Text("""
+                Greedy: Always picks the most likely token
+                Top K: Samples from the K most likely tokens")
+                Text("Top P: Samples from tokens whose cumulative probability reaches P")
+                """)
             }
         }
         .navigationTitle("Settings")

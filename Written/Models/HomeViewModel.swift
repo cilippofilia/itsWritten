@@ -13,7 +13,6 @@ import SwiftUI
 public class HomeViewModel {
     var placeholderText: String = ""
     var chatHistory: [ChatModel] = []
-    var chatThreads: [ChatThread] = []
 
     init() {
         setRandomPlaceholderText()
@@ -35,11 +34,4 @@ public class HomeViewModel {
         placeholderText = text + "..."
     }
 
-    func upsertThread(_ thread: ChatThread) {
-        if let index = chatThreads.firstIndex(where: { $0.id == thread.id }) {
-            chatThreads[index] = thread
-        } else {
-            chatThreads.append(thread)
-        }
-    }
 }

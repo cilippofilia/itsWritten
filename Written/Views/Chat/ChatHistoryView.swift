@@ -7,23 +7,51 @@
 
 import FoundationModels
 import SwiftUI
+import SwiftData
 
 struct ChatHistoryView: View {
-    @Environment(HomeViewModel.self) private var viewModel
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ChatThread.lastUpdated, order: .reverse) private var chatThreads: [ChatThread]
 
     @Binding var config: ModelConfiguration
     @State private var presentedSheet: SheetType?
+    @State private var showingDeleteAllConfirmation = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.chatThreads.isEmpty {
+                if chatThreads.isEmpty {
                     unavailableView
                 } else {
                     availableView
                 }
             }
             .navigationTitle("History")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Delete All") {
+                        showingDeleteAllConfirmation = true
+                    }
+                    .disabled(chatThreads.isEmpty)
+                    .confirmationDialog(
+                        "Delete all history?",
+                        isPresented: $showingDeleteAllConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete All", role: .destructive) {
+                            withAnimation(.easeInOut) {
+                                for thread in chatThreads {
+                                    modelContext.delete(thread)
+                                }
+                                try? modelContext.save()
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This will permanently remove all saved conversations.")
+                    }
+                }
+            }
             .sheet(item: $presentedSheet) { sheet in
                 sheet.view
             }
@@ -37,7 +65,10 @@ struct ChatHistoryView: View {
             Text("You don't have any conversation history yet")
         } actions: {
             Button(action: {
-                viewModel.chatThreads.append(contentsOf: ChatThread.sampleThreads)
+                for thread in ChatThread.sampleThreads {
+                    modelContext.insert(thread)
+                }
+                try? modelContext.save()
             }) {
                 Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
             }
@@ -46,7 +77,7 @@ struct ChatHistoryView: View {
 
     var availableView: some View {
         List {
-            ForEach(viewModel.chatThreads.reversed()) { thread in
+            ForEach(chatThreads) { thread in
                 Button(action: {
                     let session = buildSession(for: thread)
                     presentedSheet = .chatV2(
@@ -58,23 +89,13 @@ struct ChatHistoryView: View {
                         initialMessages: thread.messages
                     )
                 }) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(thread.title)
-                            .bold()
-
-                        Text(firstUserPrompt(in: thread) ?? "")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .clipShape(.rect(cornerRadius: 12, style: .continuous))
-                    .contentShape(.rect(cornerRadius: 12, style: .continuous))
+                    ChatHistoryRowView(thread: thread)
                 }
                 .listRowSeparator(.hidden)
-                .listRowInsets(.init(top: 8, leading: 8, bottom: 0, trailing: 8))
+                .listRowInsets(.init(top: 4, leading: 8, bottom: 4, trailing: 8))
+                .listRowBackground(Color.clear)
             }
+            .onDelete(perform: deleteThreads)
         }
         .listStyle(.plain)
     }
@@ -105,12 +126,17 @@ struct ChatHistoryView: View {
         return LanguageModelSession(transcript: Transcript(entries: entries))
     }
 
-    private func firstUserPrompt(in thread: ChatThread) -> String? {
-        thread.messages.first(where: { $0.isUser })?.content
+    private func deleteThreads(at offsets: IndexSet) {
+        withAnimation(.easeInOut) {
+            for index in offsets {
+                modelContext.delete(chatThreads[index])
+            }
+            try? modelContext.save()
+        }
     }
 }
 
 #Preview {
     ChatHistoryView(config: .constant(ModelConfiguration()))
-        .environment(HomeViewModel())
+        .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct WrittenApp: App {
@@ -13,5 +14,6 @@ struct WrittenApp: App {
         WindowGroup {
             AvailabilityView()
         }
+        .modelContainer(for: [ChatThread.self, ChatMessage.self])
     }
 }

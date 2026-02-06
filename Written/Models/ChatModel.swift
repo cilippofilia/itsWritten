@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 
 struct ChatModel: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
@@ -16,11 +17,12 @@ struct ChatModel: Codable, Hashable, Identifiable {
 }
 
 /// Represents a single message in a chat conversation.
-struct ChatMessage: Codable, Hashable, Identifiable {
-    let id: UUID
-    let content: String
-    let isUser: Bool
-    let timestamp: Date
+@Model
+final class ChatMessage: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var content: String
+    var isUser: Bool
+    var timestamp: Date
 
     init(id: UUID = UUID(), content: String, isUser: Bool, timestamp: Date = .now) {
         self.id = id
