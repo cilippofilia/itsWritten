@@ -83,7 +83,7 @@ struct ModelSettingsSheet: View {
                 Text("""
                 Greedy: Always picks the most likely token
                 Top K: Samples from the K most likely tokens")
-                Text("Top P: Samples from tokens whose cumulative probability reaches P")
+                Top P: Samples from tokens whose cumulative probability reaches P
                 """)
             }
         }
