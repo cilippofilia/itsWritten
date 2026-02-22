@@ -18,12 +18,15 @@ struct LaunchView: View {
                         showsSplash = false
                     }
                 }
-                .transition(.opacity)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+                .zIndex(1)
             } else {
                 AvailabilityView()
-                    .transition(.opacity)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .zIndex(0)
             }
         }
+        .background(.background)
         .animation(.easeInOut, value: showsSplash)
     }
 }
