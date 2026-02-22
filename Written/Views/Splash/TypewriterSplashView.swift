@@ -28,9 +28,7 @@ struct TypewriterSplashView: View {
                 .scaledToFit()
                 .frame(width: 20)
                 .opacity(isBlinking ? 0.25 : 1)
-//                .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: isBlinking)
-//                .animation(.snappy(duration: 0.5).repeatForever(autoreverses: true), value: isBlinking)
-                .animation(.default.repeatForever(autoreverses: true), value: isBlinking)
+                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isBlinking)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
