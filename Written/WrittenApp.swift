@@ -12,7 +12,7 @@ import SwiftData
 struct WrittenApp: App {
     var body: some Scene {
         WindowGroup {
-            AvailabilityView()
+            LaunchView()
         }
         .modelContainer(for: [ChatThread.self, ChatMessage.self])
     }

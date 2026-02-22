@@ -1,0 +1,33 @@
+//
+//  LaunchView.swift
+//  Written
+//
+//  Created by Filippo Cilia on 22/02/2026.
+//
+
+import SwiftUI
+
+struct LaunchView: View {
+    @State private var showsSplash = true
+
+    var body: some View {
+        ZStack {
+            if showsSplash {
+                TypewriterSplashView {
+                    withAnimation(.easeInOut) {
+                        showsSplash = false
+                    }
+                }
+                .transition(.opacity)
+            } else {
+                AvailabilityView()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut, value: showsSplash)
+    }
+}
+
+#Preview {
+    LaunchView()
+}
