@@ -17,11 +17,12 @@ enum SheetType: Identifiable, Equatable {
         seedPrompt: String?,
         session: LanguageModelSession,
         config: Binding<ModelConfiguration>,
+        responseType: Binding<ModelResponseType>,
         threadId: UUID?,
         initialMessages: [ChatMessage]
     )
     case chat(title: String, prompt: String, answer: String)
-    case settings(Binding<ModelConfiguration>)
+    case settings(Binding<ModelConfiguration>, Binding<ModelResponseType>)
 
     var id: String {
         switch self {
@@ -65,6 +66,7 @@ enum SheetType: Identifiable, Equatable {
             let seedPrompt,
             let session,
             let config,
+            let responseType,
             let threadId,
             let initialMessages
         ):
@@ -74,6 +76,7 @@ enum SheetType: Identifiable, Equatable {
                     seedPrompt: seedPrompt,
                     session: session,
                     configuration: config,
+                    responseType: responseType,
                     threadId: threadId,
                     initialMessages: initialMessages
                 )
@@ -81,8 +84,11 @@ enum SheetType: Identifiable, Equatable {
             .background(.ultraThinMaterial)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-        case .settings(let config):
-            ModelSettingsSheet(configuration: config)
+        case .settings(let config, let responseType):
+            ModelSettingsSheet(
+                configuration: config,
+                responseType: responseType
+            )
                 .background(.ultraThinMaterial)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)

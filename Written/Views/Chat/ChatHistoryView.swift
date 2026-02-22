@@ -14,6 +14,7 @@ struct ChatHistoryView: View {
     @Query(sort: \ChatThread.lastUpdated, order: .reverse) private var chatThreads: [ChatThread]
 
     @Binding var config: ModelConfiguration
+    @Binding var responseType: ModelResponseType
     @State private var presentedSheet: SheetType?
     @State private var showingDeleteAllConfirmation = false
 
@@ -64,6 +65,7 @@ struct ChatHistoryView: View {
         } description: {
             Text("You don't have any conversation history yet")
         } actions: {
+            #if DEBUG
             Button(action: {
                 for thread in ChatThread.sampleThreads {
                     modelContext.insert(thread)
@@ -72,6 +74,7 @@ struct ChatHistoryView: View {
             }) {
                 Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
             }
+            #endif
         }
     }
 
@@ -85,6 +88,7 @@ struct ChatHistoryView: View {
                         seedPrompt: nil,
                         session: session,
                         config: $config,
+                        responseType: $responseType,
                         threadId: thread.id,
                         initialMessages: thread.messages
                     )
@@ -137,6 +141,9 @@ struct ChatHistoryView: View {
 }
 
 #Preview {
-    ChatHistoryView(config: .constant(ModelConfiguration()))
-        .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
+    ChatHistoryView(
+        config: .constant(ModelConfiguration()),
+        responseType: .constant(.standard)
+    )
+    .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

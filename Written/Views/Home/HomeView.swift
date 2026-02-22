@@ -13,6 +13,7 @@ struct HomeView: View {
     @Environment(CountdownViewModel.self) private var countDownViewModel
 
     @State private var config = ModelConfiguration()
+    @State private var responseType = ModelResponseType.standard
     @State private var presentedSheet: SheetType?
     @State private var session = LanguageModelSession()
     @State private var showChatHistoryView = false
@@ -23,6 +24,7 @@ struct HomeView: View {
             HomeContentView(
                 shouldSend: $shouldSend,
                 config: $config,
+                responseType: $responseType,
                 session: session
             )
             .toolbar {
@@ -38,7 +40,10 @@ struct HomeView: View {
                 session.prewarm(promptPrefix: .init(config.instructions))
             }
             .navigationDestination(isPresented: $showChatHistoryView) {
-                ChatHistoryView(config: $config)
+                ChatHistoryView(
+                    config: $config,
+                    responseType: $responseType
+                )
             }
         }
     }
@@ -56,8 +61,14 @@ struct HomeView: View {
                 ),
                 showChatHistoryView: $showChatHistoryView,
                 showSettings: .init(
-                    get: { presentedSheet == .settings($config) },
-                    set: { if $0 { presentedSheet = .settings($config) } else { presentedSheet = nil } }
+                    get: { presentedSheet == .settings($config, $responseType) },
+                    set: {
+                        if $0 {
+                            presentedSheet = .settings($config, $responseType)
+                        } else {
+                            presentedSheet = nil
+                        }
+                    }
                 ),
             )
         }

@@ -17,10 +17,10 @@ struct ExpandableText: View {
 
     var body: some View {
         if text.count <= threshold {
-            Text(text)
+            FormattedMessageText(text: text)
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                Text(text)
+                FormattedMessageText(text: text)
                     .lineLimit(isExpanded ? nil : lineLimit)
 
                 Button(isExpanded ? "Show less" : "Show more") {

@@ -21,6 +21,7 @@ struct HomeContentView: View {
     @Binding var shouldSend: Bool
 
     @Binding var config: ModelConfiguration
+    @Binding var responseType: ModelResponseType
     let session: LanguageModelSession
 
     var body: some View {
@@ -99,6 +100,7 @@ extension HomeContentView {
                 seedPrompt: prompt,
                 session: session,
                 config: $config,
+                responseType: $responseType,
                 threadId: nil,
                 initialMessages: []
             )
@@ -158,6 +160,7 @@ extension HomeContentView {
     HomeContentView(
         shouldSend: .constant(false),
         config: .constant(ModelConfiguration()),
+        responseType: .constant(.standard),
         session: LanguageModelSession()
     )
     .environment(HomeViewModel())

@@ -18,30 +18,38 @@ struct ModelSettingsSheet: View {
 
     /// Optional binding for response type selection (standard, streaming, or human-like).
     var responseType: Binding<ModelResponseType>? = nil
+    
+    #if DEBUG
+    private let isEditable = true
+    #else
+    private let isEditable = false
+    #endif
 
     var body: some View {
         Form {
             Section {
-                TextField(
-                    "Instructions",
-                    text: $configuration.instructions,
-                    axis: .vertical
-                )
-                .lineLimit(12, reservesSpace: true)
-                .labelsHidden()
+                if isEditable {
+                    TextField(
+                        "Instructions",
+                        text: $configuration.instructions,
+                        axis: .vertical
+                    )
+                    .lineLimit(12, reservesSpace: true)
+                    .labelsHidden()
+                } else {
+                    FormattedMessageText(text: configuration.instructions)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
+                }
             } header: {
                 Text("Instructions")
                     .padding(.top)
-            } footer: {
-                VStack(alignment: .leading) {
-                    Text("⚠️ DO NOT DELETE THESE INSTRUCTIONS.⚠️")
-                    Text("Feel free to modify and refine them as needed. If you find better responses with different settings please share them with me.\n\nLots of love, Filippo")
-                }
             }
 
             Section {
                 LabeledContent("Temperature: \(configuration.temperature, format: .number.precision(.fractionLength(2)))") {
                     Slider(value: $configuration.temperature, in: 0...1)
+                        .disabled(!isEditable)
                 }
 
                 if let responseType {
@@ -51,6 +59,7 @@ struct ModelSettingsSheet: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .disabled(!isEditable)
                 }
             } header: {
                 Text("Response")
@@ -65,16 +74,19 @@ struct ModelSettingsSheet: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(!isEditable)
 
                 if configuration.samplingType == .topK {
                     LabeledContent("Top K: \(Int(configuration.topK))") {
                         Slider(value: $configuration.topK, in: 1...100, step: 5)
+                            .disabled(!isEditable)
                     }
                 }
 
                 if configuration.samplingType == .topP {
                     LabeledContent("Top P: \(configuration.topP, format: .number.precision(.fractionLength(2)))") {
                         Slider(value: $configuration.topP, in: 0...1)
+                            .disabled(!isEditable)
                     }
                 }
             } header: {
@@ -82,10 +94,12 @@ struct ModelSettingsSheet: View {
             } footer: {
                 Text("""
                 Greedy: Always picks the most likely token
-                Top K: Samples from the K most likely tokens")
+                Top K: Samples from the K most likely tokens
                 Top P: Samples from tokens whose cumulative probability reaches P
                 """)
             }
+
+            AppInfoSection()
         }
         .navigationTitle("Settings")
         .formStyle(.grouped)

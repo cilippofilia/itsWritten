@@ -21,7 +21,7 @@ struct ChatView: View {
     @State private var isResponding = false
     @State private var showingSettings = false
     @State private var hasSeeded = false
-    @State private var responseType = ModelResponseType.standard
+    @Binding var responseType: ModelResponseType
     @State private var threadId: UUID?
 
     let title: String
@@ -32,6 +32,7 @@ struct ChatView: View {
         seedPrompt: String?,
         session: LanguageModelSession,
         configuration: Binding<ModelConfiguration>,
+        responseType: Binding<ModelResponseType>,
         threadId: UUID?,
         initialMessages: [ChatMessage]
     ) {
@@ -40,6 +41,7 @@ struct ChatView: View {
         self._configuration = configuration
         self._session = State(initialValue: session)
         self._messages = State(initialValue: initialMessages)
+        self._responseType = responseType
         self._threadId = State(initialValue: threadId)
     }
 
@@ -273,6 +275,7 @@ struct ChatView: View {
             seedPrompt: nil,
             session: LanguageModelSession(),
             configuration: .constant(ModelConfiguration()),
+            responseType: .constant(.standard),
             threadId: nil,
             initialMessages: []
         )
