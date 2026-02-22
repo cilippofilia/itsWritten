@@ -20,10 +20,10 @@ struct OnboardingView: View {
             accent: .orange
         ),
         .init(
-            title: "Write, then breathe",
-            detail: "Share what’s on your mind. Written offers compassionate reflections and gentle prompts.",
-            systemImage: "pencil.and.outline",
-            accent: .teal
+            title: "Write with a timer",
+            detail: "Set a focused session and let the timer hold your pace, with gentle breaks when you need them.",
+            systemImage: "timer",
+            accent: .mint
         ),
         .init(
             title: "Guided, not prescriptive",

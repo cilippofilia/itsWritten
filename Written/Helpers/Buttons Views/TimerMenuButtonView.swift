@@ -10,8 +10,8 @@ import SwiftUI
 struct TimerMenuButtonView: View {
     @Environment(CountdownViewModel.self) var viewModel
 
-    let timers: [Int] = [5, 300, 600, 900, 1200, 1500, 1800]
-    
+    var timers: [Int] = [300, 600, 900, 1200, 1500, 1800]
+
     var body: some View {
         Group {
             if viewModel.timerActive || viewModel.timerPaused {
