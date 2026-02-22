@@ -45,7 +45,7 @@ struct TypewriterSplashView: View {
                 displayedText.append(character)
                 try await Task.sleep(for: .milliseconds(150))
             }
-            try await Task.sleep(for: .milliseconds(30))
+            try await Task.sleep(for: .milliseconds(700))
             onFinish()
         } catch {
             return
