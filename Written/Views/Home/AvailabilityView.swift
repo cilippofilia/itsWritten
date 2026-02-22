@@ -18,15 +18,22 @@ struct AvailabilityView: View {
         Group {
             switch model?.availability {
             case .available:
-                if hasCompletedOnboarding {
-                    HomeView()
-                        .environment(homeVM)
-                        .environment(countDownVM)
-                } else {
-                    OnboardingView {
-                        hasCompletedOnboarding = true
+                ZStack {
+                    if hasCompletedOnboarding {
+                        HomeView()
+                            .environment(homeVM)
+                            .environment(countDownVM)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        OnboardingView {
+                            withAnimation(.easeInOut) {
+                                hasCompletedOnboarding = true
+                            }
+                        }
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                 }
+                .animation(.easeInOut, value: hasCompletedOnboarding)
             case .unavailable(.modelNotReady):
                 ModelNotReadyView(action: {
                     model = SystemLanguageModel.default
