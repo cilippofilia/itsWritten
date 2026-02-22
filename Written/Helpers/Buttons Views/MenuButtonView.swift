@@ -12,11 +12,16 @@ struct MenuButtonView: View {
     @Binding var showLanguageSupportSheet: Bool
     @Binding var showChatHistoryView: Bool
     @Binding var showSettings: Bool
+    let showOnboarding: () -> Void
 
     var body: some View {
         Menu {
             // TODO: ideas to implement
-            Label("Onboarding", systemImage: "book.pages")
+            Button(action: {
+                showOnboarding()
+            }) {
+                Label("Onboarding", systemImage: "book.pages")
+            }
 
             Button(action: {
                 showChatHistoryView = true
@@ -59,6 +64,7 @@ struct MenuButtonView: View {
         showWhyAISheet: .constant(false),
         showLanguageSupportSheet: .constant(false),
         showChatHistoryView: .constant(false),
-        showSettings: .constant(false)
+        showSettings: .constant(false),
+        showOnboarding: {}
     )
 }

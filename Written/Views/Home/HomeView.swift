@@ -12,6 +12,7 @@ struct HomeView: View {
     @Environment(HomeViewModel.self) private var viewModel
     @Environment(CountdownViewModel.self) private var countDownViewModel
 
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var config = ModelConfiguration()
     @State private var responseType = ModelResponseType.standard
     @State private var presentedSheet: SheetType?
@@ -70,6 +71,10 @@ struct HomeView: View {
                         }
                     }
                 ),
+                showOnboarding: {
+                    presentedSheet = nil
+                    hasCompletedOnboarding = false
+                }
             )
         }
     }

@@ -9,6 +9,7 @@ import FoundationModels
 import SwiftUI
 
 struct AvailabilityView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var homeVM = HomeViewModel()
     @State private var countDownVM = CountdownViewModel()
     @State private var model: SystemLanguageModel?
@@ -17,9 +18,15 @@ struct AvailabilityView: View {
         Group {
             switch model?.availability {
             case .available:
-                HomeView()
-                    .environment(homeVM)
-                    .environment(countDownVM)
+                if hasCompletedOnboarding {
+                    HomeView()
+                        .environment(homeVM)
+                        .environment(countDownVM)
+                } else {
+                    OnboardingView {
+                        hasCompletedOnboarding = true
+                    }
+                }
             case .unavailable(.modelNotReady):
                 ModelNotReadyView(action: {
                     model = SystemLanguageModel.default
