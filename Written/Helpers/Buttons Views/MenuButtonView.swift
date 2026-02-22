@@ -16,34 +16,25 @@ struct MenuButtonView: View {
 
     var body: some View {
         Menu {
-            // TODO: ideas to implement
-            Button(action: {
-                showOnboarding()
-            }) {
-                Label("Onboarding", systemImage: "book.pages")
-            }
-
-            Button(action: {
-                showChatHistoryView = true
-            }) {
-                Label("History", systemImage: "clock.arrow.circlepath")
-            }
-
-            Divider()
-
-            Button(action: {
-                showLanguageSupportSheet = true
-            }) {
-                Label("Language support", systemImage: "translate")
-            }
-
             Button(action: {
                 showWhyAISheet = true
             }) {
                 Label("Why AI?", systemImage: "sparkles")
             }
 
+            Button(action: {
+                showOnboarding()
+            }) {
+                Label("Onboarding", systemImage: "book.pages")
+            }
+
             Divider()
+
+            Button(action: {
+                showChatHistoryView = true
+            }) {
+                Label("History", systemImage: "clock.arrow.circlepath")
+            }
 
             Button("Settings", systemImage: "gearshape") {
                 showSettings = true

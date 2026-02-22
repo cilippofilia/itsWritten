@@ -15,25 +15,25 @@ struct OnboardingView: View {
     private let steps: [OnboardingStep] = [
         .init(
             title: "Welcome to Written",
-            detail: "A calm space to capture your day and uncover gentle patterns in your thoughts.",
+            detail: "A quiet space to capture your day and notice gentle patterns in your thoughts.",
             systemImage: "book.closed",
             accent: .orange
         ),
         .init(
             title: "Write, then breathe",
-            detail: "Share what is on your mind. Written responds with compassionate reflections and prompts.",
+            detail: "Share what’s on your mind. Written offers compassionate reflections and gentle prompts.",
             systemImage: "pencil.and.outline",
             accent: .teal
         ),
         .init(
             title: "Guided, not prescriptive",
-            detail: "Insights are framed as possibilities to help you explore, never as instructions.",
+            detail: "Insights are framed as possibilities to explore, never as instructions.",
             systemImage: "sparkles",
             accent: .pink
         ),
         .init(
             title: "Your pace, your privacy",
-            detail: "You stay in control of your entries and how you engage with them.",
+            detail: "You stay in control of your entries and how you engage with them. Apple Intelligence runs on your device, and private cloud requests aren’t stored or shared.",
             systemImage: "hand.raised",
             accent: .indigo
         )
@@ -50,6 +50,8 @@ struct OnboardingView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                Spacer(minLength: 100)
             }
             .navigationTitle("Written")
         }

@@ -28,6 +28,7 @@ struct OnboardingStepView: View {
             Text(step.detail)
                 .font(.body)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
         }
         .padding()
         .frame(maxWidth: .infinity)

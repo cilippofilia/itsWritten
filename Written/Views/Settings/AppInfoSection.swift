@@ -11,7 +11,6 @@ struct AppInfoSection: View {
     private let bundleIdentifier = Bundle.main.bundleIdentifier
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     private let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
-    private let locale = Locale.current.identifier
 
     private var resolvedVersion: String {
         version ?? "Unknown"
@@ -22,7 +21,6 @@ struct AppInfoSection: View {
             LabeledContent("Version", value: resolvedVersion)
             LabeledContent("Model", value: "Apple Intelligence")
             LabeledContent("iOS", value: osVersion)
-            LabeledContent("Locale", value: locale)
         } header: {
             Text("App Info")
         }
