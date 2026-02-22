@@ -55,12 +55,21 @@ struct OnboardingView: View {
             }
             .navigationTitle("Written")
         }
+        .onTapGesture {
+            advance()
+        }
         .safeAreaInset(edge: .bottom) {
             OnboardingFooterView(
                 canGoBack: visibleCount > 1,
                 isLastStep: visibleCount == steps.count,
                 backAction: goBack,
-                primaryAction: advanceOrFinish,
+                primaryAction: {
+                    if visibleCount < steps.count {
+                        advance()
+                    } else {
+                        finish()
+                    }
+                },
                 secondaryAction: skipToLast
             )
         }
@@ -73,24 +82,22 @@ struct OnboardingView: View {
         }
     }
 
-    private func advanceOrFinish() {
+    private func advance() {
         if visibleCount < steps.count {
             withAnimation(.easeInOut) {
                 visibleCount += 1
             }
-        } else {
-            onFinish()
         }
     }
 
     private func skipToLast() {
-        guard visibleCount < steps.count else {
-            onFinish()
-            return
-        }
         withAnimation(.easeInOut) {
             visibleCount = steps.count
         }
+    }
+
+    private func finish() {
+        onFinish()
     }
 }
 
