@@ -43,6 +43,7 @@ final class ChatThreadTests: XCTestCase {
         let fetched = try context.fetch(FetchDescriptor<ChatThread>())
         XCTAssertEqual(fetched.count, 1)
         XCTAssertEqual(fetched.first?.messages.count, 2)
-        XCTAssertEqual(fetched.first?.messages.first?.content, "Hello")
+        let contents = fetched.first?.messages.map(\.content) ?? []
+        XCTAssertEqual(Set(contents), Set(["Hello", "Hi there"]))
     }
 }
