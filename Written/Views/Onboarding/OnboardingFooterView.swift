@@ -31,11 +31,12 @@ struct OnboardingFooterView: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.glass)
             .foregroundStyle(.secondary)
+            .disabled(isLastStep)
 
             Spacer()
 
             if isLastStep {
-                Button("Get Started") {
+                Button("Let's write!") {
                     primaryAction()
                 }
                 .buttonStyle(.borderedProminent)

@@ -30,6 +30,7 @@ struct OnboardingStepView: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
+        .frame(maxWidth: .infinity)
         .background {
             GlassEffectContainer {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)

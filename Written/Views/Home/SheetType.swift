@@ -82,7 +82,7 @@ enum SheetType: Identifiable, Equatable {
                 )
             }
             .background(.ultraThinMaterial)
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .settings(let config, let responseType):
             ModelSettingsSheet(
@@ -90,7 +90,7 @@ enum SheetType: Identifiable, Equatable {
                 responseType: responseType
             )
                 .background(.ultraThinMaterial)
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
     }
