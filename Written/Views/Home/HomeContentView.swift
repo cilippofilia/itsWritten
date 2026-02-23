@@ -117,7 +117,7 @@ extension HomeContentView {
 
     @MainActor
     private func generateTitle(from input: String) async throws -> String {
-        let titleSession = LanguageModelSession(instructions: "Summarize the prompt in a few words withot changing the overall meaning of it. Please return the summarized title directly.")
+        let titleSession = AppLanguageModel.session(instructions: "Summarize the prompt in a few words withot changing the overall meaning of it. Please return the summarized title directly.")
         var title = ""
         for try await partial in titleSession.streamResponse(to: input) {
             title = partial.content
@@ -161,7 +161,7 @@ extension HomeContentView {
         shouldSend: .constant(false),
         config: .constant(ModelConfiguration()),
         responseType: .constant(.standard),
-        session: LanguageModelSession()
+        session: AppLanguageModel.session()
     )
     .environment(HomeViewModel())
     .environment(CountdownViewModel())

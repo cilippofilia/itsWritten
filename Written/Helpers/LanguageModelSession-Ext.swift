@@ -35,6 +35,6 @@ extension LanguageModelSession {
         selected.append(contentsOf: recentEntries)
 
         // Return new session from the compacted transcript.
-        return LanguageModelSession(transcript: Transcript(entries: selected))
+        return AppLanguageModel.session(transcript: Transcript(entries: selected))
     }
 }

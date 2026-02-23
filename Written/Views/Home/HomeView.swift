@@ -16,7 +16,7 @@ struct HomeView: View {
     @State private var config = ModelConfiguration()
     @State private var responseType = ModelResponseType.standard
     @State private var presentedSheet: SheetType?
-    @State private var session = LanguageModelSession()
+    @State private var session = AppLanguageModel.session()
     @State private var showChatHistoryView = false
     @State private var shouldSend = false
 
@@ -37,7 +37,7 @@ struct HomeView: View {
                 sheet.view
             }
             .onAppear {
-                session = LanguageModelSession(instructions: config.instructions)
+                session = AppLanguageModel.session(instructions: config.instructions)
                 session.prewarm(promptPrefix: .init(config.instructions))
             }
             .navigationDestination(isPresented: $showChatHistoryView) {

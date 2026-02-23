@@ -116,7 +116,7 @@ struct ChatHistoryView: View {
             }
         }
 
-        return LanguageModelSession(transcript: Transcript(entries: entries))
+        return AppLanguageModel.session(transcript: Transcript(entries: entries))
     }
 
     private func deleteThreads(at offsets: IndexSet) {

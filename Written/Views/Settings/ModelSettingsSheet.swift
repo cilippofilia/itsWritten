@@ -19,7 +19,7 @@ struct ModelSettingsSheet: View {
 
     /// Optional binding for response type selection (standard, streaming, or human-like).
     var responseType: Binding<ModelResponseType>? = nil
-    var model = SystemLanguageModel.default
+    var model = AppLanguageModel.model
 
     #if DEBUG
     private let isEditable = true

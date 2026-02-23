@@ -36,7 +36,7 @@ struct AvailabilityView: View {
                 .animation(.easeInOut, value: hasCompletedOnboarding)
             case .unavailable(.modelNotReady):
                 ModelNotReadyView(action: {
-                    model = SystemLanguageModel.default
+                    model = AppLanguageModel.model
                 })
             case .unavailable(.appleIntelligenceNotEnabled):
                 AINotEnabledView()
@@ -46,13 +46,13 @@ struct AvailabilityView: View {
                 CheckingAvailabilityView()
             @unknown default:
                 UnknownReasonView(action: {
-                    model = SystemLanguageModel.default
+                    model = AppLanguageModel.model
                 })
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
-            model = SystemLanguageModel.default
+            model = AppLanguageModel.model
         }
     }
 }

@@ -33,5 +33,4 @@ public class HomeViewModel {
         let text = placeholderOptions.randomElement() ?? "Begin writing"
         placeholderText = text + "..."
     }
-
 }

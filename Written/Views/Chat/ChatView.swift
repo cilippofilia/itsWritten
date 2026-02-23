@@ -69,9 +69,9 @@ struct ChatView: View {
         }
         .onChange(of: configuration.instructions) {
             if configuration.instructions.isReallyEmpty {
-                session = LanguageModelSession()
+                session = AppLanguageModel.session()
             } else {
-                session = LanguageModelSession(instructions: configuration.instructions)
+                session = AppLanguageModel.session(instructions: configuration.instructions)
             }
         }
         .onAppear {
@@ -89,7 +89,6 @@ struct ChatView: View {
     @MainActor
     func sendMessage() {
         guard input.isReallyEmpty == false else { return }
-
         let prompt = input.trimmed
         messages.append(ChatMessage(content: prompt, isUser: true))
         input = ""
@@ -273,7 +272,7 @@ struct ChatView: View {
         ChatView(
             title: "Preview",
             seedPrompt: nil,
-            session: LanguageModelSession(),
+            session: AppLanguageModel.session(),
             configuration: .constant(ModelConfiguration()),
             responseType: .constant(.standard),
             threadId: nil,
