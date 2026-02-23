@@ -14,7 +14,7 @@ struct OnboardingView: View {
 
     private let steps: [OnboardingStep] = [
         .init(
-            title: "Welcome to Written",
+            title: "Welcome to itsWritten",
             detail: "A quiet space to capture your day and notice gentle patterns in your thoughts.",
             systemImage: "book.closed",
             accent: .orange
@@ -53,7 +53,7 @@ struct OnboardingView: View {
 
                 Spacer(minLength: 100)
             }
-            .navigationTitle("Written")
+            .navigationTitle("itsWritten")
         }
         .onTapGesture {
             advance()

@@ -13,7 +13,7 @@ struct TypewriterSplashView: View {
     @State private var isBlinking = false
     @State private var displayedText = ""
 
-    private let brandText = "Written"
+    private let brandText = "itsWritten"
 
     var body: some View {
         HStack(spacing: 0) {
