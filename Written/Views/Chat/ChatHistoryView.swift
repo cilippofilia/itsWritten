@@ -64,17 +64,6 @@ struct ChatHistoryView: View {
             Label("No History", systemImage: "bubble.left.and.exclamationmark.bubble.right")
         } description: {
             Text("You don't have any conversation history yet")
-        } actions: {
-            #if DEBUG
-            Button(action: {
-                for thread in ChatThread.sampleThreads {
-                    modelContext.insert(thread)
-                }
-                try? modelContext.save()
-            }) {
-                Label("Add sample data", systemImage: "bubble.left.and.text.bubble.right")
-            }
-            #endif
         }
     }
 
