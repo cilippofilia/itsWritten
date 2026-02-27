@@ -24,9 +24,9 @@ struct WrittenApp: App {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: isPrivacyShieldVisible)
+            .animation(.easeInOut, value: isPrivacyShieldVisible)
             .onChange(of: scenePhase) { _, newValue in
-                isPrivacyShieldVisible = newValue != .active
+                isPrivacyShieldVisible = newValue == .inactive
             }
         }
         .modelContainer(for: [ChatThread.self, ChatMessage.self])
