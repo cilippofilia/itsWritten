@@ -39,7 +39,6 @@ struct PromptInputView: View {
                 .disabled(text.isReallyEmpty || isDisabled)
         }
         .padding()
-        .background(Color.clear)
     }
 }
 
