@@ -18,11 +18,12 @@ struct WrittenApp: App {
             ZStack {
                 LaunchView()
                     .privacySensitive()
-
+                #if !DEBUG
                 if isPrivacyShieldVisible {
                     PrivacyShieldView()
                         .transition(.opacity)
                 }
+                #endif
             }
             .animation(.easeInOut, value: isPrivacyShieldVisible)
             .onChange(of: scenePhase) { _, newValue in
