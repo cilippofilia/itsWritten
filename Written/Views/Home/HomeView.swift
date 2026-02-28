@@ -9,10 +9,11 @@ import FoundationModels
 import SwiftUI
 
 struct HomeView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
     @Environment(HomeViewModel.self) private var viewModel
     @Environment(CountdownViewModel.self) private var countDownViewModel
 
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var config = ModelConfiguration()
     @State private var responseType = ModelResponseType.standard
     @State private var presentedSheet: SheetType?

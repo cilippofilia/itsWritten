@@ -22,8 +22,7 @@ struct TypewriterSplashView: View {
                     .font(.largeTitle)
                     .bold()
             }
-            Image("WrittenAppIcon")
-                .renderingMode(.template)
+            Image("TypewriterIcon")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 20)
