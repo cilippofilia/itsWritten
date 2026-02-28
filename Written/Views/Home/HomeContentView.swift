@@ -95,7 +95,7 @@ extension HomeContentView {
 
         do {
             let title = try await generateTitle(from: prompt)
-            presentedSheet = .chatV2(
+            presentedSheet = .chat(
                 title: title,
                 seedPrompt: prompt,
                 session: session,

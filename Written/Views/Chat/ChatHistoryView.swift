@@ -72,7 +72,7 @@ struct ChatHistoryView: View {
             ForEach(chatThreads) { thread in
                 Button(action: {
                     let session = buildSession(for: thread)
-                    presentedSheet = .chatV2(
+                    presentedSheet = .chat(
                         title: thread.title,
                         seedPrompt: nil,
                         session: session,

@@ -12,7 +12,7 @@ import SwiftUI
 enum SheetType: Identifiable, Equatable {
     case whyAI
     case languageSupport
-    case chatV2(
+    case chat(
         title: String,
         seedPrompt: String?,
         session: LanguageModelSession,
@@ -21,7 +21,6 @@ enum SheetType: Identifiable, Equatable {
         threadId: UUID?,
         initialMessages: [ChatMessage]
     )
-    case chat(title: String, prompt: String, answer: String)
     case settings(Binding<ModelConfiguration>, Binding<ModelResponseType>)
 
     var id: String {
@@ -32,8 +31,6 @@ enum SheetType: Identifiable, Equatable {
             return "languageSupport"
         case .chat:
             return "chat"
-        case .chatV2:
-            return "chatV2"
         case .settings:
             return "settings"
         }
@@ -55,13 +52,7 @@ enum SheetType: Identifiable, Equatable {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
 
-        case .chat(let title, let prompt, let answer):
-            ChatSheet(title: title, prompt: prompt, answer: answer)
-                .background(.ultraThinMaterial)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-
-        case .chatV2(
+        case .chat(
             let title,
             let seedPrompt,
             let session,
