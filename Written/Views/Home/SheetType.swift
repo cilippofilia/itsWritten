@@ -62,6 +62,7 @@ enum SheetType: Identifiable, Equatable {
                     threadId: threadId,
                     initialMessages: initialMessages
                 )
+                .hideSensitiveData()
             }
             .background(.ultraThinMaterial)
             .presentationDetents([.large])

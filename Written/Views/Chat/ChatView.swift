@@ -64,8 +64,6 @@ struct ChatView: View {
                 isDisabled: isResponding,
                 onSubmit: sendMessage
             )
-            .padding()
-            .background(.bar)
         }
         .onChange(of: configuration.instructions) {
             if configuration.instructions.isReallyEmpty {

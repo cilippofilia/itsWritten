@@ -32,6 +32,7 @@ struct HomeContentView: View {
                 placeholderText: viewModel.placeholderText,
                 isResponding: session.isResponding
             )
+            .hideSensitiveData()
 
             if countDownViewModel.timerActive || countDownViewModel.timerPaused {
                 CountdownView()

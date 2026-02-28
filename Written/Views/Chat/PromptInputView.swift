@@ -12,16 +12,10 @@ import SwiftUI
 /// This view provides a text field with automatic vertical expansion and a circular
 /// send button that becomes disabled when the input is empty or the view is disabled.
 struct PromptInputView: View {
-    /// The text entered by the user.
     @Binding var text: String
 
-    /// The placeholder text displayed when the field is empty.
     let placeholder: String
-
-    /// Whether the input should be disabled.
     let isDisabled: Bool
-
-    /// The action to perform when the user submits the input.
     let onSubmit: () -> Void
 
     var body: some View {
@@ -36,15 +30,24 @@ struct PromptInputView: View {
                 .onSubmit(onSubmit)
 
             Button("Send", systemImage: "arrow.up.circle.fill", action: onSubmit)
+                .imageScale(.large)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .blue.gradient)
                 .buttonStyle(.plain)
                 .labelStyle(.iconOnly)
                 .font(.title)
                 .disabled(text.isReallyEmpty || isDisabled)
-                .foregroundStyle(text.isReallyEmpty || isDisabled ? .secondary : Color.accentColor)
         }
+        .padding()
+        .background(Color.clear)
     }
 }
 
-#Preview {
+#Preview("Dark") {
+    PromptInputView(text: .constant("Txt"), placeholder: "Placeholder", isDisabled: false, onSubmit: { })
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Light") {
     PromptInputView(text: .constant("Txt"), placeholder: "Placeholder", isDisabled: false, onSubmit: { })
 }

@@ -25,6 +25,7 @@ struct ChatHistoryView: View {
                     unavailableView
                 } else {
                     availableView
+                        .hideSensitiveData()
                 }
             }
             .navigationTitle("History")
