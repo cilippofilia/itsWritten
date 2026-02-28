@@ -57,10 +57,6 @@ struct HomeView: View {
                     get: { presentedSheet == .whyAI },
                     set: { if $0 { presentedSheet = .whyAI } else { presentedSheet = nil } }
                 ),
-                showLanguageSupportSheet: .init(
-                    get: { presentedSheet == .languageSupport },
-                    set: { if $0 { presentedSheet = .languageSupport } else { presentedSheet = nil } }
-                ),
                 showChatHistoryView: $showChatHistoryView,
                 showSettings: .init(
                     get: { presentedSheet == .settings($config, $responseType) },

@@ -11,7 +11,6 @@ import SwiftUI
 
 enum SheetType: Identifiable, Equatable {
     case whyAI
-    case languageSupport
     case chat(
         title: String,
         seedPrompt: String?,
@@ -27,8 +26,6 @@ enum SheetType: Identifiable, Equatable {
         switch self {
         case .whyAI:
             return "whyAI"
-        case .languageSupport:
-            return "languageSupport"
         case .chat:
             return "chat"
         case .settings:
@@ -44,12 +41,6 @@ enum SheetType: Identifiable, Equatable {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(.ultraThinMaterial)
                 .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-
-        case .languageSupport:
-            LanguageSupportView()
-                .background(.ultraThinMaterial)
-                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
 
         case .chat(
@@ -80,9 +71,9 @@ enum SheetType: Identifiable, Equatable {
                 configuration: config,
                 responseType: responseType
             )
-                .background(.ultraThinMaterial)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+            .background(.ultraThinMaterial)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 

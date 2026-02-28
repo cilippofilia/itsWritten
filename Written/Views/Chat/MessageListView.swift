@@ -19,11 +19,6 @@ struct MessageListView: View {
                         MessageBubble(message: message)
                             .id(message.id)
                     }
-
-                    if isResponding {
-                        TypingIndicator()
-                            .id("typing")
-                    }
                 }
                 .padding()
             }

@@ -9,36 +9,17 @@ import SwiftUI
 
 struct MenuButtonView: View {
     @Binding var showWhyAISheet: Bool
-    @Binding var showLanguageSupportSheet: Bool
     @Binding var showChatHistoryView: Bool
     @Binding var showSettings: Bool
     let showOnboarding: () -> Void
 
     var body: some View {
         Menu {
-            Button(action: {
-                showWhyAISheet = true
-            }) {
-                Label("Why AI?", systemImage: "sparkles")
-            }
-
-            Button(action: {
-                showOnboarding()
-            }) {
-                Label("Onboarding", systemImage: "book.pages")
-            }
-
+            whyAIButton
+            showOnboardingButton
             Divider()
-
-            Button(action: {
-                showChatHistoryView = true
-            }) {
-                Label("History", systemImage: "clock.arrow.circlepath")
-            }
-
-            Button("Settings", systemImage: "gearshape") {
-                showSettings = true
-            }
+            chatHistoryButton
+            settingsButton
         } label: {
             Label("Menu", systemImage: "line.3.horizontal")
                 .labelStyle(.iconOnly)
@@ -50,12 +31,40 @@ struct MenuButtonView: View {
     }
 }
 
+private extension MenuButtonView {
+    var whyAIButton: some View {
+        Button(action: {
+            showWhyAISheet = true
+        }) {
+            Label("Why AI?", systemImage: "sparkles")
+        }
+    }
+    var showOnboardingButton: some View {
+        Button(action: {
+            showOnboarding()
+        }) {
+            Label("Onboarding", systemImage: "book.pages")
+        }
+    }
+    var chatHistoryButton: some View {
+        Button(action: {
+            showChatHistoryView = true
+        }) {
+            Label("History", systemImage: "clock.arrow.circlepath")
+        }
+    }
+    var settingsButton: some View {
+        Button("Settings", systemImage: "gearshape") {
+            showSettings = true
+        }
+    }
+}
+
 #Preview {
     MenuButtonView(
         showWhyAISheet: .constant(false),
-        showLanguageSupportSheet: .constant(false),
         showChatHistoryView: .constant(false),
         showSettings: .constant(false),
-        showOnboarding: {}
+        showOnboarding: { }
     )
 }
