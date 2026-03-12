@@ -18,6 +18,7 @@ struct ModelSettingsSheet: View {
     @Binding var responseType: ModelResponseType
 
     var model = AppLanguageModel.model
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Form {
@@ -32,9 +33,16 @@ struct ModelSettingsSheet: View {
                 let currentLanguage = Locale.current.language
                 let isSupported = model.supportedLanguages.contains(currentLanguage)
 
-                LabeledContent("Current Language") {
-                    Text(displayName(for: currentLanguage))
+                Button {
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(URL(string: "app-settings:")!)
+                    }
+                } label: {
+                    LabeledContent("Current Language") {
+                        Text(displayName(for: currentLanguage))
+                    }
                 }
+                .buttonStyle(.plain)
 
                 if isSupported {
                     Label("Current language is supported", systemImage: "checkmark.circle.fill")
@@ -44,11 +52,11 @@ struct ModelSettingsSheet: View {
                         .foregroundStyle(.red)
                 }
             } header: {
-                Text("Language Support")
+                Text("AI Language Support")
                     .padding(.top)
             }
 
-            Section("Supported Languages") {
+            Section("AI Supported Languages") {
                 ForEach(Array(model.supportedLanguages).sorted(by: { displayName(for: $0) < displayName(for: $1) }), id: \.self) { language in
                     Text(displayName(for: language))
                 }
