@@ -34,8 +34,8 @@ struct ModelSettingsSheet: View {
                 let isSupported = model.supportedLanguages.contains(currentLanguage)
 
                 Button {
-                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(URL(string: "app-settings:")!)
+                    if let settingsURL = URL(string: "app-settings:") {
+                        openURL(settingsURL)
                     }
                 } label: {
                     LabeledContent("Current Language") {
