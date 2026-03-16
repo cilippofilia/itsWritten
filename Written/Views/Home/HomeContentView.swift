@@ -119,13 +119,27 @@ extension HomeContentView {
 
     @MainActor
     private func generateTitle(from input: String) async throws -> String {
-        let titleSession = AppLanguageModel.session(instructions: "Summarize the prompt in a few words withot changing the overall meaning of it. Please return the summarized title directly.")
+        let instructions = """
+        Summarize the prompt into a short title of 5 to 8 words.
+        DO NOT use tools, lists, markdown, numbering, or quotes.
+        Return only the title text.
+        """
+        let titleSession = AppLanguageModel.sessionWithoutTools(instructions: instructions)
         var title = ""
         for try await partial in titleSession.streamResponse(to: input) {
             title = partial.content
         }
 
-        return title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = title
+            .replacing("\n", with: " ")
+            .replacing("#", with: "")
+            .replacing("-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let words = normalized.split(whereSeparator: \.isWhitespace)
+        let clipped = words.prefix(8).joined(separator: " ")
+        let finalTitle = clipped.isEmpty ? "New Conversation" : clipped
+        return finalTitle
     }
 
     @MainActor
