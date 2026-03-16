@@ -18,7 +18,8 @@ struct MessageBubble: View {
         let alignment = message.isUser ? Alignment.trailing : .leading
 
         FormattedMessageText(text: message.content)
-            .padding(16)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 12)
             .background(message.isUser ? Color.blue.gradient : Color.gray.opacity(0.2).gradient)
             .foregroundStyle(message.isUser ? Color.white : Color.primary)
             .clipShape(.rect(cornerRadius: 18))

@@ -30,6 +30,7 @@ struct HomeTextEditor: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .focused($isFocused)
+            .scrollDismissesKeyboard(.interactively)
             .scrollBounceBehavior(.basedOnSize)
             .scrollContentBackground(.hidden)
             .disabled(isResponding)

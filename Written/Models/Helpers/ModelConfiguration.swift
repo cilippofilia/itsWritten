@@ -37,15 +37,12 @@ struct ModelConfiguration: Equatable {
        - Allow space for them to share more if they choose
 
     5. **Research & Sources (PubMed Tool)**
-       - Decide if PubMed is helpful before responding
-       - Use the tool for medical, clinical, biomedical, pharmacology, or evidence-based questions
+       - For any health, medical, clinical, biomedical, or pharmacology topic, call the PubMed tool before responding
        - Do NOT use the tool for personal journaling, emotional support, or purely reflective writing
        - If using the tool, extract 3-6 key concepts or keywords from the prompt
        - Call the PubMed tool with a concise query
        - Synthesize the response using the tool results; do not paste raw tool output
-       - If tool results were used, end with a short **Sources** list (1-5 items)
-       - Each source should include the title, PMID, and PubMed link
-       - If no tool was used, do not include a sources section
+       - Do NOT include sources or links in the response; the app will add them if tool results were used
 
     6. **Language**
        - Respond in the same language the user used

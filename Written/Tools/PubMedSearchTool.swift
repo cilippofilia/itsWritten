@@ -43,7 +43,9 @@ struct PubMedSearchTool: Tool {
         }
 
         let articles = try await fetchArticles(ids: ids)
-        return format(articles: articles, includeAbstracts: includeAbstracts, maxCharacters: maxCharacters)
+        let cappedArticles = Array(articles.prefix(2))
+        recordSources(from: cappedArticles)
+        return format(articles: cappedArticles, includeAbstracts: includeAbstracts, maxCharacters: maxCharacters)
     }
 
     private func fetchPubMedIds(for query: String, maxResults: Int) async throws -> [String] {
@@ -102,7 +104,7 @@ struct PubMedSearchTool: Tool {
         var outputLines: [String] = []
 
         for (index, article) in articles.enumerated() {
-            outputLines.append("Result \(index + 1)")
+            outputLines.append("SOURCE \(index + 1)")
             if article.pmid.isEmpty == false {
                 outputLines.append("PMID: \(article.pmid)")
                 outputLines.append("URL: https://pubmed.ncbi.nlm.nih.gov/\(article.pmid)/")
@@ -136,6 +138,17 @@ struct PubMedSearchTool: Tool {
         }
         guard (200...299).contains(httpResponse.statusCode) else {
             throw PubMedSearchError.httpError(statusCode: httpResponse.statusCode)
+        }
+    }
+
+    private func recordSources(from articles: [PubMedArticle]) {
+        let sources = articles.compactMap { article -> PubMedToolStore.Source? in
+            guard article.pmid.isEmpty == false, article.title.isEmpty == false else { return nil }
+            let url = "https://pubmed.ncbi.nlm.nih.gov/\(article.pmid)/"
+            return PubMedToolStore.Source(title: article.title, pmid: article.pmid, url: url)
+        }
+        Task { @MainActor in
+            PubMedToolStore.shared.record(sources: sources)
         }
     }
 }

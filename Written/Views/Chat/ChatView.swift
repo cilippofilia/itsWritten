@@ -12,6 +12,7 @@ import SwiftData
 struct ChatView: View {
     @Environment(HomeViewModel.self) private var viewModel
     @Environment(\.modelContext) private var modelContext
+    @Environment(PubMedToolStore.self) private var pubMedStore
 
     @Binding var configuration: ModelConfiguration
 
@@ -50,7 +51,7 @@ struct ChatView: View {
             Text(title)
                 .font(.title2)
                 .bold()
-                .padding()
+                .padding(8)
                 .padding(.top)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.leading)
@@ -87,6 +88,7 @@ struct ChatView: View {
     @MainActor
     func sendMessage() {
         guard input.isReallyEmpty == false else { return }
+        pubMedStore.reset()
         let prompt = input.trimmed
         messages.append(ChatMessage(content: prompt, isUser: true))
         input = ""
@@ -112,12 +114,14 @@ struct ChatView: View {
 
         do {
             let response = try await session.respond(to: prompt, options: configuration.generationOptions)
-            messages.append(ChatMessage(content: response.content, isUser: false))
+            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+            messages.append(ChatMessage(content: content, isUser: false))
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             session = session.compactedSession(from: session)
             do {
                 let response = try await session.respond(to: prompt, options: configuration.generationOptions)
-                messages.append(ChatMessage(content: response.content, isUser: false))
+                let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+                messages.append(ChatMessage(content: content, isUser: false))
             } catch {
                 appendErrorMessage()
             }
@@ -152,6 +156,13 @@ struct ChatView: View {
                     )
                 }
             }
+            let finalContent = appendSourcesIfNeeded(to: sanitizedResponse(messages[messageIndex].content))
+            messages[messageIndex] = ChatMessage(
+                id: messageId,
+                content: finalContent,
+                isUser: false,
+                timestamp: timestamp
+            )
         } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
             session = session.compactedSession(from: session)
             do {
@@ -165,6 +176,13 @@ struct ChatView: View {
                         )
                     }
                 }
+                let finalContent = appendSourcesIfNeeded(to: sanitizedResponse(messages[messageIndex].content))
+                messages[messageIndex] = ChatMessage(
+                    id: messageId,
+                    content: finalContent,
+                    isUser: false,
+                    timestamp: timestamp
+                )
             } catch {
                 messages[messageIndex] = ChatMessage(
                     id: messageId,
@@ -206,7 +224,8 @@ struct ChatView: View {
                 try await Task.sleep(for: simulatedTime - (.now - startTime))
             }
 
-            messages.append(ChatMessage(content: response.content, isUser: false))
+            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+            messages.append(ChatMessage(content: content, isUser: false))
         } catch {
             appendErrorMessage()
         }
@@ -218,6 +237,30 @@ struct ChatView: View {
     @MainActor
     func appendErrorMessage() {
         messages.append(ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false))
+    }
+
+    @MainActor
+    private func sanitizedResponse(_ response: String) -> String {
+        response
+            .split(whereSeparator: \.isNewline)
+            .filter { $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("Sources:") == false }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    @MainActor
+    private func appendSourcesIfNeeded(to response: String) -> String {
+        guard pubMedStore.wasUsed, pubMedStore.sources.isEmpty == false else {
+            return response
+        }
+
+        let sources = pubMedStore.sources.prefix(2).map { source in
+            let safeTitle = source.title.replacing("\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(safeTitle) - PMID: \(source.pmid) - \(source.url)"
+        }
+
+        let sourcesLine = "Sources: " + sources.joined(separator: "; ")
+        return response.isEmpty ? sourcesLine : "\(response)\n\n\(sourcesLine)"
     }
 
     @MainActor
@@ -278,5 +321,6 @@ struct ChatView: View {
         )
     }
     .environment(HomeViewModel())
+    .environment(PubMedToolStore.shared)
     .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

@@ -42,11 +42,28 @@ struct PromptInputView: View {
     }
 }
 
+#if DEBUG
+private struct PromptInputPreviewWrapper: View {
+    @State private var text = "Txt"
+
+    let colorScheme: ColorScheme?
+
+    var body: some View {
+        PromptInputView(
+            text: $text,
+            placeholder: "Placeholder",
+            isDisabled: false,
+            onSubmit: { }
+        )
+        .preferredColorScheme(colorScheme)
+    }
+}
+
 #Preview("Dark") {
-    PromptInputView(text: .constant("Txt"), placeholder: "Placeholder", isDisabled: false, onSubmit: { })
-        .preferredColorScheme(.dark)
+    PromptInputPreviewWrapper(colorScheme: .dark)
 }
 
 #Preview("Light") {
-    PromptInputView(text: .constant("Txt"), placeholder: "Placeholder", isDisabled: false, onSubmit: { })
+    PromptInputPreviewWrapper(colorScheme: .light)
 }
+#endif

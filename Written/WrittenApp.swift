@@ -29,6 +29,7 @@ struct WrittenApp: App {
             .onChange(of: scenePhase) { _, newValue in
                 isPrivacyShieldVisible = newValue == .inactive
             }
+            .environment(PubMedToolStore.shared)
         }
         .modelContainer(for: [ChatThread.self, ChatMessage.self])
     }
