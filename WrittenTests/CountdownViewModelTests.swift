@@ -21,6 +21,14 @@ final class CountdownViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.endTime)
     }
 
+    func testTimeRemainingReturnsZeroWithoutEndTime() {
+        let viewModel = CountdownViewModel()
+
+        let remaining = viewModel.timeRemaining(at: .now)
+
+        XCTAssertEqual(remaining, 0, accuracy: 0.01)
+    }
+
     func testPauseAndResumePreservesRemainingTime() async {
         let viewModel = CountdownViewModel()
         viewModel.startTimer(duration: 1)
@@ -42,6 +50,14 @@ final class CountdownViewModelTests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(150))
         let remainingAfterResume = viewModel.timeRemaining(at: .now)
         XCTAssertLessThan(remainingAfterResume, remaining)
+    }
+
+    func testFormattedTimePadsMinutesAndSeconds() {
+        let viewModel = CountdownViewModel()
+
+        XCTAssertEqual(viewModel.formattedTime(for: 5), "00:05")
+        XCTAssertEqual(viewModel.formattedTime(for: 65), "01:05")
+        XCTAssertEqual(viewModel.formattedTime(for: 600), "10:00")
     }
 
     func testStopTimerResetsState() {

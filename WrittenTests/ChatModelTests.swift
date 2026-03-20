@@ -30,4 +30,24 @@ final class ChatModelTests: XCTestCase {
 
         XCTAssertEqual(decoded, model)
     }
+
+    func testEqualityConsidersIdentifier() {
+        let creationDate = Date(timeIntervalSince1970: 1_706_000_000)
+        let modelA = ChatModel(
+            id: UUID(uuidString: "3F1E6A7D-2E0A-42F0-8F49-BA0D79B5F8D2")!,
+            title: "Title",
+            prompt: "Prompt",
+            response: "Response",
+            creationDate: creationDate
+        )
+        let modelB = ChatModel(
+            id: UUID(uuidString: "B0F7C2D4-5D87-4C3B-9B1C-9B9E35E7A1A4")!,
+            title: "Title",
+            prompt: "Prompt",
+            response: "Response",
+            creationDate: creationDate
+        )
+
+        XCTAssertNotEqual(modelA, modelB)
+    }
 }

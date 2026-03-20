@@ -33,8 +33,10 @@ final class ChatThreadTests: XCTestCase {
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = ModelContext(container)
 
-        let messageA = ChatMessage(content: "Hello", isUser: true)
-        let messageB = ChatMessage(content: "Hi there", isUser: false)
+        let timestampA = Date(timeIntervalSince1970: 1_706_000_100)
+        let timestampB = Date(timeIntervalSince1970: 1_706_000_200)
+        let messageA = ChatMessage(content: "Hello", isUser: true, timestamp: timestampA)
+        let messageB = ChatMessage(content: "Hi there", isUser: false, timestamp: timestampB)
         let thread = ChatThread(title: "Test Thread", messages: [messageA, messageB])
 
         context.insert(thread)
@@ -45,5 +47,7 @@ final class ChatThreadTests: XCTestCase {
         XCTAssertEqual(fetched.first?.messages.count, 2)
         let contents = fetched.first?.messages.map(\.content) ?? []
         XCTAssertEqual(Set(contents), Set(["Hello", "Hi there"]))
+        let timestamps = fetched.first?.messages.map(\.timestamp) ?? []
+        XCTAssertEqual(Set(timestamps), Set([timestampA, timestampB]))
     }
 }
