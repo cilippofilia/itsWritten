@@ -92,6 +92,7 @@ struct ChatView: View {
         let prompt = input.trimmed
         messages.append(ChatMessage(content: prompt, isUser: true))
         input = ""
+        session = compactedSessionFromMessages(excludingLastAssistant: false)
 
         Task {
             switch responseType {
@@ -112,21 +113,11 @@ struct ChatView: View {
         isResponding = true
         defer { isResponding = false }
 
-        do {
-            let response = try await session.respond(to: prompt, options: configuration.generationOptions)
-            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+        let content = await generateResponseWithRecovery(for: prompt)
+        if let content {
             messages.append(ChatMessage(content: content, isUser: false))
-        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
-            session = session.compactedSession(from: session)
-            do {
-                let response = try await session.respond(to: prompt, options: configuration.generationOptions)
-                let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
-                messages.append(ChatMessage(content: content, isUser: false))
-            } catch {
-                appendErrorMessage()
-            }
-        } catch {
-            appendErrorMessage()
+        } else {
+            appendRecoveryFailureMessage()
         }
     }
 
@@ -156,48 +147,46 @@ struct ChatView: View {
                     )
                 }
             }
-            let finalContent = appendSourcesIfNeeded(to: sanitizedResponse(messages[messageIndex].content))
-            messages[messageIndex] = ChatMessage(
-                id: messageId,
-                content: finalContent,
-                isUser: false,
-                timestamp: timestamp
-            )
-        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
-            session = session.compactedSession(from: session)
-            do {
-                for try await partial in session.streamResponse(to: prompt, options: configuration.generationOptions) {
-                    withAnimation(.default) {
-                        messages[messageIndex] = ChatMessage(
-                            id: messageId,
-                            content: partial.content,
-                            isUser: false,
-                            timestamp: timestamp
-                        )
-                    }
-                }
-                let finalContent = appendSourcesIfNeeded(to: sanitizedResponse(messages[messageIndex].content))
+            let sanitized = sanitizedResponse(messages[messageIndex].content)
+            if isRefusalMessage(sanitized), let recovered = await recoverAfterFailure(for: prompt) {
+                messages[messageIndex] = ChatMessage(
+                    id: messageId,
+                    content: recovered,
+                    isUser: false,
+                    timestamp: timestamp
+                )
+            } else if isRefusalMessage(sanitized) {
+                messages[messageIndex] = ChatMessage(
+                    id: messageId,
+                    content: recoveryFailureMessage,
+                    isUser: false,
+                    timestamp: timestamp
+                )
+            } else {
+                let finalContent = appendSourcesIfNeeded(to: sanitized)
                 messages[messageIndex] = ChatMessage(
                     id: messageId,
                     content: finalContent,
                     isUser: false,
                     timestamp: timestamp
                 )
-            } catch {
+            }
+        } catch {
+            if let recovered = await recoverAfterFailure(for: prompt) {
                 messages[messageIndex] = ChatMessage(
                     id: messageId,
-                    content: "Sorry, I couldn't generate a response.",
+                    content: recovered,
+                    isUser: false,
+                    timestamp: timestamp
+                )
+            } else {
+                messages[messageIndex] = ChatMessage(
+                    id: messageId,
+                    content: recoveryFailureMessage,
                     isUser: false,
                     timestamp: timestamp
                 )
             }
-        } catch {
-            messages[messageIndex] = ChatMessage(
-                id: messageId,
-                content: "Sorry, I couldn't generate a response.",
-                isUser: false,
-                timestamp: timestamp
-            )
         }
     }
 
@@ -211,20 +200,21 @@ struct ChatView: View {
     func generateHumanResponse(for prompt: String) async {
         let startTime = ContinuousClock.now
 
-        async let responseTask = session.respond(to: prompt, options: configuration.generationOptions)
-
         do {
             try await Task.sleep(for: .seconds(2))
             isResponding = true
 
-            let response = try await responseTask
-            let simulatedTime = Duration.seconds(1 + Double(response.content.count) * 0.02)
+            guard let content = await generateResponseWithRecovery(for: prompt) else {
+                appendRecoveryFailureMessage()
+                isResponding = false
+                return
+            }
+            let simulatedTime = Duration.seconds(1 + Double(content.count) * 0.02)
 
             if ContinuousClock.now - startTime < simulatedTime {
                 try await Task.sleep(for: simulatedTime - (.now - startTime))
             }
 
-            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
             messages.append(ChatMessage(content: content, isUser: false))
         } catch {
             appendErrorMessage()
@@ -237,6 +227,11 @@ struct ChatView: View {
     @MainActor
     func appendErrorMessage() {
         messages.append(ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false))
+    }
+
+    @MainActor
+    private func appendRecoveryFailureMessage() {
+        messages.append(ChatMessage(content: recoveryFailureMessage, isUser: false))
     }
 
     @MainActor
@@ -261,6 +256,116 @@ struct ChatView: View {
 
         let sourcesLine = "Sources: " + sources.joined(separator: "; ")
         return response.isEmpty ? sourcesLine : "\(response)\n\n\(sourcesLine)"
+    }
+
+    @MainActor
+    private func generateResponseWithRecovery(for prompt: String) async -> String? {
+        do {
+            let response = try await session.respond(to: prompt, options: configuration.generationOptions)
+            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+            if isRefusalMessage(content) {
+                return await recoverAfterFailure(for: prompt)
+            }
+            return content
+        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
+            return await recoverAfterFailure(for: prompt)
+        } catch LanguageModelSession.GenerationError.guardrailViolation {
+            return await recoverAfterFailure(for: prompt)
+        } catch {
+            return nil
+        }
+    }
+
+    @MainActor
+    private func recoverAfterFailure(for prompt: String) async -> String? {
+        session = compactedSessionFromMessages(excludingLastAssistant: true)
+        do {
+            let response = try await session.respond(to: prompt, options: configuration.generationOptions)
+            let content = appendSourcesIfNeeded(to: sanitizedResponse(response.content))
+            return isRefusalMessage(content) ? nil : content
+        } catch {
+            return nil
+        }
+    }
+
+    @MainActor
+    private func compactedSessionFromMessages(
+        excludingLastAssistant: Bool,
+        maxCharacters: Int = 4000
+    ) -> LanguageModelSession {
+        var entries: [Transcript.Entry] = []
+
+        if configuration.instructions.isReallyEmpty == false {
+            let instructionSegment = Transcript.Segment.text(.init(content: configuration.instructions))
+            let instructions = Transcript.Instructions(
+                segments: [instructionSegment],
+                toolDefinitions: []
+            )
+            entries.append(.instructions(instructions))
+        }
+
+        var ordered = Self.orderedMessages(from: messages)
+        if excludingLastAssistant, let last = ordered.last, last.isUser == false {
+            ordered.removeLast()
+        }
+
+        for message in ordered {
+            if message.isUser == false, isRefusalMessage(message.content) {
+                continue
+            }
+            let segment = Transcript.Segment.text(.init(content: message.content))
+            if message.isUser {
+                let prompt = Transcript.Prompt(segments: [segment])
+                entries.append(.prompt(prompt))
+            } else {
+                let response = Transcript.Response(assetIDs: [], segments: [segment])
+                entries.append(.response(response))
+            }
+        }
+
+        guard let first = entries.first else {
+            return session
+        }
+
+        var selected = [first]
+        var totalInstructionLength = String(describing: first).count
+        var recentEntries: [Transcript.Entry] = []
+
+        for entry in entries.dropFirst().reversed() {
+            let entryEstimateLength = String(describing: entry).count
+            guard totalInstructionLength + entryEstimateLength <= maxCharacters else { break }
+            recentEntries.insert(entry, at: 0)
+            totalInstructionLength += entryEstimateLength
+        }
+
+        selected.append(contentsOf: recentEntries)
+        return AppLanguageModel.session(transcript: Transcript(entries: selected))
+    }
+
+    @MainActor
+    private func isRefusalMessage(_ content: String) -> Bool {
+        let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let refusalPhrases = [
+            "i can't help",
+            "i cannot help",
+            "i can't assist",
+            "i cannot assist",
+            "i'm sorry, but i can't",
+            "i'm sorry, but i cannot",
+            "i'm sorry, i can't",
+            "i'm sorry, i cannot",
+            "i'm sorry, but i can't assist",
+            "i'm sorry, but i cannot assist",
+            "i can't provide that",
+            "i cannot provide that",
+            "i can't help with that",
+            "i cannot help with that"
+        ]
+        return refusalPhrases.contains { normalized.localizedStandardContains($0) }
+    }
+
+    private var recoveryFailureMessage: String {
+        "I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat."
     }
 
     @MainActor
@@ -291,14 +396,20 @@ struct ChatView: View {
         )
         let existing = (try? modelContext.fetch(fetch))?.first
         if let existing {
+            let orderedExisting = Self.orderedMessages(from: existing.messages)
+            let orderedNew = Self.orderedMessages(from: messagesToSave)
+            let hasNewMessage = orderedNew.count > orderedExisting.count
+                || orderedNew.last?.id != orderedExisting.last?.id
+            guard hasNewMessage else { return }
             existing.title = title
-            existing.messages = messagesToSave
+            existing.messages = orderedNew
             existing.lastUpdated = Date()
         } else {
+            let orderedNew = Self.orderedMessages(from: messagesToSave)
             let thread = ChatThread(
                 id: id,
                 title: title,
-                messages: messagesToSave,
+                messages: orderedNew,
                 creationDate: Date(),
                 lastUpdated: Date()
             )
