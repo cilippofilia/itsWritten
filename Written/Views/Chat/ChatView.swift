@@ -41,7 +41,7 @@ struct ChatView: View {
         self.seedPrompt = seedPrompt
         self._configuration = configuration
         self._session = State(initialValue: session)
-        self._messages = State(initialValue: initialMessages)
+        self._messages = State(initialValue: Self.orderedMessages(from: initialMessages))
         self._responseType = responseType
         self._threadId = State(initialValue: threadId)
     }
@@ -305,6 +305,15 @@ struct ChatView: View {
             modelContext.insert(thread)
         }
         try? modelContext.save()
+    }
+
+    private static func orderedMessages(from messages: [ChatMessage]) -> [ChatMessage] {
+        messages.sorted {
+            if $0.timestamp != $1.timestamp {
+                return $0.timestamp < $1.timestamp
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
     }
 }
 

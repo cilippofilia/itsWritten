@@ -74,6 +74,7 @@ struct ChatHistoryView: View {
         List {
             ForEach(chatThreads) { thread in
                 Button(action: {
+                    let orderedMessages = orderedMessages(from: thread.messages)
                     let session = buildSession(for: thread)
                     presentedSheet = .chat(
                         title: thread.title,
@@ -82,7 +83,7 @@ struct ChatHistoryView: View {
                         config: $config,
                         responseType: $responseType,
                         threadId: thread.id,
-                        initialMessages: thread.messages
+                        initialMessages: orderedMessages
                     )
                 }) {
                     ChatHistoryRowView(thread: thread)
@@ -108,7 +109,7 @@ struct ChatHistoryView: View {
             entries.append(.instructions(instructions))
         }
 
-        for message in thread.messages {
+        for message in orderedMessages(from: thread.messages) {
             let segment = Transcript.Segment.text(.init(content: message.content))
             if message.isUser {
                 let prompt = Transcript.Prompt(segments: [segment])
@@ -120,6 +121,15 @@ struct ChatHistoryView: View {
         }
 
         return AppLanguageModel.session(transcript: Transcript(entries: entries))
+    }
+
+    private func orderedMessages(from messages: [ChatMessage]) -> [ChatMessage] {
+        messages.sorted {
+            if $0.timestamp != $1.timestamp {
+                return $0.timestamp < $1.timestamp
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
     }
 
     private func deleteThreads(at offsets: IndexSet) {
