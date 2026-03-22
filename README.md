@@ -1,4 +1,4 @@
-# itsWritten
+# itsWritten: Privacy-first journaling on device
 
 ## About
 
