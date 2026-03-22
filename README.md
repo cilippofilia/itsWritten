@@ -1,175 +1,127 @@
-# itsWritten: Privacy-first journaling on device
+# itsWritten: Private journaling with on-device AI reflection
 
 ## About
 
-**itsWritten** is a privacy-first journaling app for iPhone built with SwiftUI, SwiftData, and Apple's Foundation Models framework.
+itsWritten is a SwiftUI journaling app built around a simple idea: write first, reflect second, and keep that experience on device whenever possible.
 
-The app is designed to feel calm and minimal while still being useful: you write, reflect, and optionally get AI-generated responses without sending your journal to a third-party backend. The project combines a focused writing experience, persistent chat threads, configurable response behavior, onboarding, and privacy protections aimed at keeping sensitive writing on device whenever possible.
-
----
+The app combines a focused writing surface, configurable Apple Intelligence responses, saved chat threads, onboarding, and privacy protections for sensitive content. It also includes an optional PubMed-backed research tool for biomedical questions inside the AI flow.
 
 ## Features
 
-### Writing Experience
-- Clean journaling interface with dynamic placeholder prompts
-- Focused text-entry flow designed around fast capture
-- Built-in writing timer with pause and resume support
-- Typewriter-style launch experience and onboarding flow
+### Writing Flow
+
+- Minimal journal-first home screen designed for quick capture.
+- Optional writing timer with start, pause, resume, and expiry handling.
+- Typewriter-style launch and onboarding experience.
+- Restorable onboarding from the main menu.
 
 ### AI Reflection
-- On-device AI responses using `FoundationModels`
-- Multiple response modes:
-  - `standard`
-  - `streaming`
-  - `human`
-- Configurable model instructions and sampling behavior
-- Session prewarming and recovery handling for failed or refused responses
 
-### Chat and Persistence
-- Dedicated chat view for AI-assisted reflection
-- Conversation history saved with SwiftData
-- Restorable chat threads for returning to previous sessions
+- On-device response generation through Apple’s `FoundationModels` APIs.
+- Multiple response styles, including standard and streaming.
+- Configurable instructions, temperature, and sampling strategy.
+- Dedicated chat view for continuing a reflection after the first response.
+- Chat history screen for reopening previous threads.
 
-### Research Support
-- Built-in PubMed tool integration for biomedical lookups
-- Source capture and source attribution appended to responses when the tool is used
+### Persistence And Tools
 
-### Privacy and Safety
-- Privacy shield when the app becomes inactive in non-debug builds
-- Privacy-sensitive content handling in the main interface
-- On-device-first design with no custom backend in the repository
+- SwiftData-backed storage for chat threads and messages.
+- Shared PubMed tool integration for biomedical lookups.
+- Source recording for tool-backed responses.
 
----
+### Privacy
+
+- Privacy-sensitive rendering on the main interface.
+- Privacy shield when the app moves inactive outside debug builds.
+- Sensitive-data helper views for protected UI presentation.
 
 ## Tech Stack
 
-### Core
-- Swift
 - SwiftUI
 - SwiftData
-- FoundationModels
-
-### Supporting APIs
-- Observation via `@Observable`
-- Modern Swift concurrency
-- `AppStorage` for lightweight preferences
+- Foundation Models
+- `@Observable` state models
+- Swift concurrency
 - `URLSession` for PubMed requests
 
----
-
-## Architecture
-
-The app follows a feature-oriented SwiftUI structure with state held in observable models and persistence handled through SwiftData.
+## Project Structure
 
 ```text
 itsWritten/
 ├── itsWritten/
-│   ├── Assets/                     # App assets and icons
-│   ├── Helpers/                    # Shared helpers and privacy utilities
-│   │   └── SensitiveData/          # Screenshot/privacy protection helpers
-│   ├── Models/                     # App state and persisted models
-│   │   └── Helpers/                # Model configuration and response helpers
-│   ├── Tools/                      # External tool integrations
-│   │   └── PubMedSearchTool.swift
-│   ├── Views/
-│   │   ├── Chat/                   # AI chat experience and history
-│   │   ├── Helpers/                # Shared view components
-│   │   ├── Home/                   # Main journaling flow
-│   │   ├── Onboarding/             # First-run onboarding
-│   │   ├── Privacy/                # Privacy shield UI
-│   │   ├── Settings/               # Model and app settings
-│   │   ├── Splash/                 # Launch and intro views
-│   │   └── Unavailable Views/      # Apple Intelligence availability states
-│   └── itsWrittenApp.swift         # App entry point
-└── itsWrittenTests/                # Unit tests
+│   ├── Assets/
+│   ├── Helpers/
+│   │   └── SensitiveData/
+│   ├── Models/
+│   │   └── Helpers/
+│   ├── Tools/
+│   └── Views/
+│       ├── Chat/
+│       ├── Helpers/
+│       ├── Home/
+│       ├── Onboarding/
+│       ├── Privacy/
+│       ├── Settings/
+│       ├── Splash/
+│       └── Unavailable Views/
+├── itsWrittenTests/
+└── itsWritten.xcodeproj
 ```
 
-### Patterns
-- Feature-based SwiftUI composition
-- `@Observable` models for shared state
-- `NavigationStack` for navigation
-- SwiftData for thread/message persistence
-- Tool-backed language model sessions for richer responses
-
----
+The app entry point is [`itsWritten/itsWrittenApp.swift`](itsWritten/itsWrittenApp.swift), which sets up the SwiftData container for `ChatThread` and `ChatMessage`, injects the shared PubMed tool store, and overlays the privacy shield when the scene becomes inactive.
 
 ## Requirements
 
 - Xcode 26 or later
-- iOS 26.0 or later
-- Swift 6.2 or later
-- A device that supports Apple Intelligence for the AI features
+- iOS 26.0+
+- Swift 6.2+
+- A device configuration that supports Apple Intelligence for AI-powered features
 
-Some functionality, especially model availability, depends on Apple Intelligence support and device configuration.
-
----
+The checked-in project currently uses iOS 26.0 deployment settings. AI availability depends on Apple Intelligence support, device eligibility, and system configuration.
 
 ## Getting Started
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/cilippofilia/itsWritten.git
-   cd itsWritten
-   ```
+```bash
+git clone https://github.com/cilippofilia/itsWritten.git
+cd itsWritten
+```
 
 2. Open the project in Xcode:
 
-   ```bash
-   open itsWritten.xcodeproj
-   ```
-
-3. Select an iPhone target or supported device.
-
-4. Build and run.
-
-If you want to test AI features, make sure Apple Intelligence is available and enabled on the device you use.
-
----
-
-## Current Project Status
-
-This project is actively in development.
-
-Implemented today:
-- Main journaling flow
-- Timer support
-- Onboarding
-- AI chat flow
-- Streaming and alternate response modes
-- SwiftData-backed thread persistence
-- Model settings UI
-- PubMed search tool integration
-- Privacy shield behavior
-
-Still evolving:
-- Product polish and copy refinement
-- Additional testing coverage
-- Broader settings and customization
-- More robust handling around model availability and edge cases
-
----
-
-## Testing
-
-The repository includes unit tests in `itsWrittenTests`, including coverage for core chat and countdown logic.
-
-Run tests from Xcode or with:
-
 ```bash
-xcodebuild test -project itsWritten.xcodeproj -scheme itsWritten -destination 'platform=iOS Simulator,name=iPhone 16'
+open itsWritten.xcodeproj
 ```
 
-You may need to adjust the simulator destination to match what is installed locally.
+3. Select the `itsWritten` scheme and an iPhone device or simulator.
 
----
+4. Build and run the app.
 
-## License
+For the full AI experience, run on a device or environment where Apple Intelligence is available and enabled.
 
-This project is proprietary software. All rights reserved.
+## Development Notes
 
----
+- The main journaling flow lives under `itsWritten/Views/Home`.
+- Chat screens and history management live under `itsWritten/Views/Chat`.
+- Model configuration and response behavior helpers live under `itsWritten/Models/Helpers`.
+- The PubMed tool implementation lives in `itsWritten/Tools/PubMedSearchTool.swift`.
+- Availability fallback screens live under `itsWritten/Views/Unavailable Views`.
+
+## Tests
+
+Unit tests live in `itsWrittenTests` and currently cover:
+
+- `ChatModel` codable and equality behavior
+- `ChatThread` persistence with SwiftData
+- `CountdownViewModel` timer lifecycle and formatting
+
+Run tests from Xcode’s test action for the `itsWritten` scheme.
 
 ## Author
 
 Filippo Cilia
+
+## License
+
+This project is proprietary software. All rights reserved.
