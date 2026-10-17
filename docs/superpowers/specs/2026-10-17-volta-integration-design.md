@@ -133,19 +133,22 @@ Orchestrator rules, applied inside the existing loops (`respondDetailed`,
 | Call carries | Capable provider | Plain provider |
 |---|---|---|
 | nothing extra | plain path | plain path |
-| `tools` and/or `options` | capable path | **plain path, tools dropped**; `options.temperature` maps onto the vendor temperature where Volta already sends one |
+| `tools` and/or `options` | capable path | **plain path, tools and options dropped** (the cloud keeps Volta's configured temperature) |
 | `generating:` type | capable path | **skipped** (never asked, never sent data); if nothing capable remains, throw a new `ProviderError.capabilityUnavailable` |
 
 Skipping happens *before* the privacy gate, the same way the context
 pre-flight already does, so the user is never asked about a provider that
 can't serve the call.
 
-### 1.3 Public API (additive, defaulted)
+### 1.3 Public API (additive overloads)
 
-Existing methods gain trailing defaulted parameters:
+Volta's package floor is iOS 18, so the existing methods can't take
+FoundationModels types. Instead, new `@available(iOS 26.0, macOS 26.0, *)`
+overloads take a **required** `tools:` label (which also avoids overload
+ambiguity with the existing methods) and a defaulted `options:`:
 
 ```swift
-respond(to:instructions:history:need:tools: [any Tool] = [], options: GenerationOptions? = nil)
+respond(to:instructions:history:need:tools: [any Tool], options: GenerationOptions? = nil)
 respondDetailed(…same…)
 streamResponse(…same…)
 streamDetailed(…same…)
@@ -164,6 +167,10 @@ func respond<Content: Generable & Sendable>(
     need: ModelNeed? = nil
 ) async throws -> Content
 ```
+
+Structured calls always build a fresh on-device session and never use the
+warm-session cache: their output isn't chat text, so there's no history to
+continue.
 
 All of this is `@available(iOS 26.0, macOS 26.0, *)` where it touches
 FoundationModels types, consistent with Volta's gating.
