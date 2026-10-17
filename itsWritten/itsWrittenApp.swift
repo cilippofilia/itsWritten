@@ -14,6 +14,7 @@ struct WrittenApp: App {
     @State private var isPrivacyShieldVisible = false
     @State private var removeAdsStore = RemoveAdsStore()
     @State private var crossPromoSignal = CrossPromoSignal()
+    @State private var aiProvider = AIProviderStore()
 
     var body: some Scene {
         WindowGroup {
@@ -36,6 +37,7 @@ struct WrittenApp: App {
             .environment(OpenFDAToolStore.shared)
             .environment(removeAdsStore)
             .environment(crossPromoSignal)
+            .environment(aiProvider)
         }
         .modelContainer(for: [ChatThread.self, ChatMessage.self])
     }
