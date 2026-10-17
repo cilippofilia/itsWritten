@@ -21,6 +21,7 @@ enum ConsentDestination: Hashable, Sendable {
     init?(provider: ProviderIdentifier, privacyLevel: PrivacyLevel) {
         switch privacyLevel {
         case .appleCloud:
+            guard provider == .privateCloudCompute else { return nil }
             self = .privateCloudCompute
         case .external:
             let vendor = CloudVendor.allCases.first { vendor in

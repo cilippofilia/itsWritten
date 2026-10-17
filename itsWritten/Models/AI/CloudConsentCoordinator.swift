@@ -13,25 +13,32 @@ import VoltaSDK
 /// the user answers the prompt published in `pendingRequest`. Nothing is
 /// sent anywhere without a "yes".
 ///
-/// Bookkeeping: every suspended call is a `CheckedContinuation` that lives in
-/// exactly one place, either `currentWaiters` (the prompt on screen) or one
-/// entry of `queue` (destinations waiting their turn, FIFO). A continuation is
-/// always removed from storage before it is resumed, so each one is resumed
-/// exactly once.
+/// Bookkeeping: every suspended call is a `CheckedContinuation`, tagged with a
+/// token, that lives in exactly one place: either `currentWaiters` (the prompt
+/// on screen) or one entry of `queue` (destinations waiting their turn, FIFO).
+/// Answers, resets and cancellations all remove a continuation from storage
+/// before resuming it, and only resume what they removed, so each one is
+/// resumed exactly once.
 @MainActor
 @Observable
 final class CloudConsentCoordinator {
+    /// One suspended `request(_:)` call. The token lets cancellation find it.
+    private struct Waiter {
+        let token: UUID
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
     /// A destination waiting for its turn, with every call asking for it.
     private struct QueuedPrompt {
         let destination: ConsentDestination
-        var waiters: [CheckedContinuation<Bool, Never>]
+        var waiters: [Waiter]
     }
 
     /// The prompt the UI should show, or `nil` when nothing is waiting.
     private(set) var pendingRequest: ConsentRequest?
 
     /// Calls waiting on `pendingRequest`.
-    @ObservationIgnored private var currentWaiters: [CheckedContinuation<Bool, Never>] = []
+    @ObservationIgnored private var currentWaiters: [Waiter] = []
     /// Prompts for other destinations, in arrival order.
     @ObservationIgnored private var queue: [QueuedPrompt] = []
     /// Destinations the user allowed during this conversation.
@@ -47,7 +54,8 @@ final class CloudConsentCoordinator {
     /// Returns `false` without prompting for destinations the app cannot
     /// describe, and `true` without prompting when the destination is always
     /// allowed or was allowed earlier in this conversation. Otherwise waits
-    /// for the user's answer.
+    /// for the user's answer. If the calling task is cancelled while waiting,
+    /// returns `false`.
     func request(_ downgrade: PrivacyDowngrade) async -> Bool {
         guard let destination = ConsentDestination(provider: downgrade.provider, privacyLevel: downgrade.to) else {
             return false
@@ -55,15 +63,33 @@ final class CloudConsentCoordinator {
         if isAllowedWithoutPrompt(destination) {
             return true
         }
-        return await withCheckedContinuation { continuation in
-            enqueue(continuation, for: destination)
+        let token = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                // Cancelled before we could enqueue: the handler below has
+                // nothing to find, so answer here.
+                guard !Task.isCancelled else {
+                    continuation.resume(returning: false)
+                    return
+                }
+                enqueue(Waiter(token: token, continuation: continuation), for: destination)
+            }
+        } onCancel: {
+            Task { @MainActor in
+                self.cancelWaiter(token)
+            }
         }
     }
 
-    /// Answers the current prompt. Every call waiting on it gets `allow`.
-    /// A "yes" is remembered for the rest of the conversation; a "no" is not.
-    func respond(allow: Bool) {
-        guard let request = pendingRequest else { return }
+    /// Answers the prompt with the given id. Every call waiting on it gets
+    /// `allow`. A "yes" is remembered for the rest of the conversation; a
+    /// "no" is not.
+    ///
+    /// Does nothing unless `requestID` is the prompt currently shown, so a
+    /// duplicate or stale answer can never answer a prompt the user has not
+    /// seen.
+    func respond(to requestID: ConsentRequest.ID, allow: Bool) {
+        guard let request = pendingRequest, request.id == requestID else { return }
         let waiters = currentWaiters
         currentWaiters = []
         pendingRequest = nil
@@ -71,7 +97,7 @@ final class CloudConsentCoordinator {
             conversationGrants.insert(request.destination)
         }
         for waiter in waiters {
-            waiter.resume(returning: allow)
+            waiter.continuation.resume(returning: allow)
         }
         showNextPrompt()
     }
@@ -84,7 +110,7 @@ final class CloudConsentCoordinator {
         queue = []
         pendingRequest = nil
         for waiter in waiters {
-            waiter.resume(returning: false)
+            waiter.continuation.resume(returning: false)
         }
     }
 
@@ -105,16 +131,40 @@ final class CloudConsentCoordinator {
     }
 
     /// Adds a waiter to the prompt for its destination, creating one if needed.
-    private func enqueue(_ continuation: CheckedContinuation<Bool, Never>, for destination: ConsentDestination) {
+    private func enqueue(_ waiter: Waiter, for destination: ConsentDestination) {
         if pendingRequest?.destination == destination {
-            currentWaiters.append(continuation)
+            currentWaiters.append(waiter)
         } else if let index = queue.firstIndex(where: { $0.destination == destination }) {
-            queue[index].waiters.append(continuation)
+            queue[index].waiters.append(waiter)
         } else {
-            queue.append(QueuedPrompt(destination: destination, waiters: [continuation]))
+            queue.append(QueuedPrompt(destination: destination, waiters: [waiter]))
             if pendingRequest == nil {
                 showNextPrompt()
             }
+        }
+    }
+
+    /// Declines one cancelled call, if it is still waiting. A call that was
+    /// already answered is no longer stored, so it is never resumed twice.
+    private func cancelWaiter(_ token: UUID) {
+        if let index = currentWaiters.firstIndex(where: { $0.token == token }) {
+            let waiter = currentWaiters.remove(at: index)
+            if currentWaiters.isEmpty {
+                // Nobody is waiting on the shown prompt any more.
+                pendingRequest = nil
+                showNextPrompt()
+            }
+            waiter.continuation.resume(returning: false)
+            return
+        }
+        for queueIndex in queue.indices {
+            guard let index = queue[queueIndex].waiters.firstIndex(where: { $0.token == token }) else { continue }
+            let waiter = queue[queueIndex].waiters.remove(at: index)
+            if queue[queueIndex].waiters.isEmpty {
+                queue.remove(at: queueIndex)
+            }
+            waiter.continuation.resume(returning: false)
+            return
         }
     }
 
@@ -126,7 +176,7 @@ final class CloudConsentCoordinator {
             let next = queue.removeFirst()
             if isAllowedWithoutPrompt(next.destination) {
                 for waiter in next.waiters {
-                    waiter.resume(returning: true)
+                    waiter.continuation.resume(returning: true)
                 }
                 continue
             }
