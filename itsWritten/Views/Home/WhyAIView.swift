@@ -10,7 +10,9 @@ import SwiftUI
 struct WhyAIView: View {
     let analogy: String = """
 
-    Think of most AI services like mailing a letter - once you send it, the post office has a copy and can read it. Apple's AI is like whispering to yourself (on-device) or using a secure vault that destroys the contents immediately after reading it to you (Private Cloud Compute). Not even Apple keeps a copy.
+    Think of most AI services like mailing a letter - once you send it, the post office has a copy and can read it. \
+    Apple's AI is like whispering to yourself (on-device) or using a secure vault \
+    that destroys the contents immediately after reading it to you (Private Cloud Compute). Not even Apple keeps a copy.
         
     """
     let explanation: String = """

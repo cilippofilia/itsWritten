@@ -87,7 +87,7 @@ struct MessageBubble: View {
 #Preview("AI response - Dark") {
     MessageBubble(
         message: ChatMessage(
-            content: "This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.This is my message as a response to the previous one.",
+            content: String(repeating: "This is my message as a response to the previous one. ", count: 8),
             isUser: false,
             toolNames: ["PubMed"],
             toolSources: [
