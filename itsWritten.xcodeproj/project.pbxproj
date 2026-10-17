@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18E5B2E830843AA400F697FF /* VoltaSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 18E5B2E730843AA400F697FF /* VoltaSDK */; };
 		E37A0CB5FD5A50DDDAA7220E /* PrivateAds in Frameworks */ = {isa = PBXBuildFile; productRef = 593A9540A8F7F15CE05FF14F /* PrivateAds */; };
 /* End PBXBuildFile section */
 
@@ -57,6 +58,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				18E5B2E830843AA400F697FF /* VoltaSDK in Frameworks */,
 				E37A0CB5FD5A50DDDAA7220E /* PrivateAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -112,6 +114,7 @@
 			name = itsWritten;
 			packageProductDependencies = (
 				593A9540A8F7F15CE05FF14F /* PrivateAds */,
+				18E5B2E730843AA400F697FF /* VoltaSDK */,
 			);
 			productName = itsWritten;
 			productReference = 18A488EE2E68BD5F00A87380 /* itsWritten.app */;
@@ -170,6 +173,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7225408F94A3DE33FED69C64 /* XCRemoteSwiftPackageReference "PrivateAds" */,
+				18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "../VoltaSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 18A488EF2E68BD5F00A87380 /* Products */;
@@ -544,6 +548,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "../VoltaSDK" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../VoltaSDK;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		7225408F94A3DE33FED69C64 /* XCRemoteSwiftPackageReference "PrivateAds" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -556,6 +567,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		18E5B2E730843AA400F697FF /* VoltaSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VoltaSDK;
+		};
 		593A9540A8F7F15CE05FF14F /* PrivateAds */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7225408F94A3DE33FED69C64 /* XCRemoteSwiftPackageReference "PrivateAds" */;
