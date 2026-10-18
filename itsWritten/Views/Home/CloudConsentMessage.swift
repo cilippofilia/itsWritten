@@ -12,6 +12,11 @@ enum CloudConsentMessage {
         localized: "Highlighted words are replaced with placeholders before sending, and put back when the answer arrives. Tap one to send it as is."
     )
 
+    /// Shown when names in the conversation couldn't be checked automatically.
+    static let namesUncheckedWarning = String(
+        localized: "Names couldn't be checked automatically in this language, so any names in this chat will be sent as written."
+    )
+
     /// Heading for details found only in earlier messages.
     static let earlierLabel = String(localized: "Also hidden from this chat")
 

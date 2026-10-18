@@ -27,6 +27,48 @@ enum SensitiveTextDetector {
         return resolvingOverlaps(candidates)
     }
 
+    // MARK: - Name coverage
+
+    /// Languages whose names the tagger finds reliably. Measured on device-class
+    /// models: German, French and Portuguese miss common first names, and
+    /// Japanese, Chinese and Korean have no name model at all.
+    static let reliableNameLanguages: Set<NLLanguage> = [.english, .italian, .spanish]
+
+    /// The paragraphs of `text` whose names can't be checked automatically:
+    /// written in a language outside `reliableNameLanguages`, or one this device
+    /// has no name model for. Checked per paragraph, so a question in Japanese
+    /// inside an English template still counts.
+    ///
+    /// A short reply with no capital letters after its first character ("ok",
+    /// "thanks") has no name to miss and too few words to identify its language,
+    /// so it counts as checked (in scripts with letter case only).
+    static func uncheckedParagraphs(in text: String, hasNameModel: (NLLanguage) -> Bool = hasNameModel) -> [String] {
+        text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { paragraph in
+                guard paragraph.contains(where: \.isLetter), isShortAndUncapitalized(paragraph) == false else { return false }
+                let recognizer = NLLanguageRecognizer()
+                recognizer.processString(paragraph)
+                guard let language = recognizer.dominantLanguage, reliableNameLanguages.contains(language) else { return true }
+                return hasNameModel(language) == false
+            }
+    }
+
+    /// Whether this device can find names in `language`. The iOS Simulator has
+    /// no name model for any language.
+    @Sendable
+    static func hasNameModel(for language: NLLanguage) -> Bool {
+        NLTagger.availableTagSchemes(for: .word, language: language).contains(.nameType)
+    }
+
+    /// Only for scripts with letter case: Japanese or Chinese has neither spaces
+    /// nor capitals, so a whole sentence would look like a short reply.
+    private static func isShortAndUncapitalized(_ paragraph: String) -> Bool {
+        let words = paragraph.split(whereSeparator: \.isWhitespace)
+        let isCasedScript = paragraph.filter(\.isLetter).allSatisfy(\.isCased)
+        return isCasedScript && words.count <= 3 && paragraph.dropFirst().contains(where: \.isUppercase) == false
+    }
+
     // MARK: - Overlaps
 
     /// Kinds in order of preference when two spans cover exactly the same text:

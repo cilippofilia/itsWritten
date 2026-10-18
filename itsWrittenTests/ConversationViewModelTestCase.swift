@@ -42,7 +42,11 @@ class ConversationViewModelTestCase: XCTestCase {
         alwaysAllowed: ConsentDestination? = nil,
         configuredVendors: Set<CloudVendor> = []
     ) throws -> (ConversationViewModel, CloudConsentCoordinator) {
-        let consent = CloudConsentCoordinator(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        // Stands in for a device: the simulator has no name model.
+        let consent = CloudConsentCoordinator(
+            defaults: UserDefaults(suiteName: UUID().uuidString)!,
+            hasNameModel: { _ in true }
+        )
         let orchestrator = AIOrchestrator(
             providers: providers,
             privacyDisclosure: .askOnPrivacyChange { await consent.request($0) },

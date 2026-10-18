@@ -74,6 +74,20 @@ detector would miss it, e.g. inside a restored assistant reply.
 A note is appended to the outgoing instructions only when something was
 replaced: keep placeholders exactly as written and don't ask what they stand for.
 
+### When names can't be checked (decided 2026-10-18)
+
+Name detection is only trusted for English, Italian and Spanish (measured:
+German, French and Portuguese miss common first names; Japanese, Chinese and
+Korean have no name model). Each paragraph the user or the app wrote (prompt,
+user history turns, instructions; not the vendor's own replies, which only
+saw placeholders) is language-checked. If any paragraph is in another
+language, or the device has no name model, the sheet is shown even when the
+vendor is allowed and nothing was detected, with the line "Names couldn't be
+checked automatically in this language, so any names in this chat will be
+sent as written." Each such paragraph needs one Send; the title call reusing
+the same text doesn't ask again. Short replies in a cased script with no
+capitals after the first letter ("ok", "thanks") count as checked.
+
 ## Architecture
 
 ### Fork (VoltaSDK)
@@ -143,5 +157,6 @@ the safe direction.
   to the pattern-based kinds.
 - The iOS Simulator ships without the name-recognition model
   (`availableTagSchemes` lacks `.nameType`), so names, places and
-  organizations are only detected on real devices; the tests that need it
-  skip in the simulator.
+  organizations are only detected on real devices, and in the simulator
+  every longer vendor message shows the sheet with the unchecked-names line.
+  The tests inject a device-like name model.

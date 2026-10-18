@@ -106,6 +106,42 @@ final class SensitiveTextDetectorTests: XCTestCase {
         XCTAssertEqual(SensitiveTextDetector.capitalizedTail(of: whole, in: name), whole)
     }
 
+    func testUncheckedParagraphsFollowLanguage() {
+        let device: (NLLanguage) -> Bool = { _ in true }
+        XCTAssertEqual(SensitiveTextDetector.uncheckedParagraphs(in: "My sister Marta lives in Moscow.", hasNameModel: device), [])
+        XCTAssertEqual(SensitiveTextDetector.uncheckedParagraphs(in: "Mia sorella Marta vive a Mosca.", hasNameModel: device), [])
+        XCTAssertEqual(
+            SensitiveTextDetector.uncheckedParagraphs(in: "姉のマルタはモスクワに住んでいます。", hasNameModel: device),
+            ["姉のマルタはモスクワに住んでいます。"]
+        )
+        XCTAssertEqual(
+            SensitiveTextDetector.uncheckedParagraphs(in: "Ma sœur Marta habite à Moscou avec son mari.", hasNameModel: device),
+            ["Ma sœur Marta habite à Moscou avec son mari."]
+        )
+    }
+
+    func testUncheckedParagraphsAreFoundInsideATemplate() {
+        let text = "User question:\n姉のマルタはモスクワに住んでいます。\n\nAnswer using only the evidence above for factual claims."
+        XCTAssertEqual(
+            SensitiveTextDetector.uncheckedParagraphs(in: text, hasNameModel: { _ in true }),
+            ["姉のマルタはモスクワに住んでいます。"]
+        )
+    }
+
+    func testShortUncapitalizedRepliesCountAsChecked() {
+        let noModel: (NLLanguage) -> Bool = { _ in false }
+        XCTAssertEqual(SensitiveTextDetector.uncheckedParagraphs(in: "ok", hasNameModel: noModel), [])
+        XCTAssertEqual(SensitiveTextDetector.uncheckedParagraphs(in: "Thanks so much", hasNameModel: noModel), [])
+        XCTAssertEqual(SensitiveTextDetector.uncheckedParagraphs(in: "ask Marta", hasNameModel: noModel), ["ask Marta"])
+    }
+
+    func testWithoutANameModelEverythingIsUnchecked() {
+        XCTAssertEqual(
+            SensitiveTextDetector.uncheckedParagraphs(in: "My sister Marta lives in Moscow.", hasNameModel: { _ in false }),
+            ["My sister Marta lives in Moscow."]
+        )
+    }
+
     func testPlainTextHasNothingToHide() {
         XCTAssertEqual(SensitiveTextDetector.spans(in: "How do I make a good risotto?"), [])
         XCTAssertEqual(SensitiveTextDetector.spans(in: ""), [])

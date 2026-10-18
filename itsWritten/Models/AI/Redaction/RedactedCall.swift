@@ -12,4 +12,7 @@ struct RedactedCall: Equatable, Sendable {
     /// Placeholders of every known detail that appears in the call, hidden or
     /// let through.
     let entityIDs: Set<RedactedEntity.ID>
+    /// Paragraphs of the call whose names couldn't be checked automatically.
+    /// Whatever names they hold go out as written.
+    var uncheckedParagraphs: Set<String> = []
 }

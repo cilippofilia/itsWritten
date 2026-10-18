@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import NaturalLanguage
 import VoltaSDK
 
 /// The personal details of one conversation and the placeholders that stand for
@@ -14,9 +15,19 @@ import VoltaSDK
 /// keep the real words (replies are restored as they arrive) and every call is
 /// redacted from scratch, so the session only has to live as long as the
 /// conversation. Losing it just means the user reviews the words again.
-struct RedactionSession: Equatable, Sendable {
+struct RedactionSession: Sendable {
     /// Every detail found so far, in the order it was first found.
     private(set) var entities: [RedactedEntity] = []
+    /// Paragraphs whose names couldn't be checked, that the user has seen in a
+    /// review sheet and sent anyway.
+    private var reviewedUncheckedParagraphs: Set<String> = []
+    /// Whether the device can find names in a language. Injected by tests to
+    /// stand in for a device, since the simulator has no name model.
+    private let hasNameModel: @Sendable (NLLanguage) -> Bool
+
+    init(hasNameModel: @escaping @Sendable (NLLanguage) -> Bool = SensitiveTextDetector.hasNameModel) {
+        self.hasNameModel = hasNameModel
+    }
 
     /// Added to the instructions whenever something was replaced, so the model
     /// keeps placeholders intact and the phone can put the words back.
@@ -38,6 +49,14 @@ struct RedactionSession: Equatable, Sendable {
         for text in texts {
             register(SensitiveTextDetector.spans(in: text))
         }
+        // The vendor's own replies only ever held placeholders, so they can't
+        // bring in names of the user's; only what the user and the app wrote counts.
+        let userTexts = [call.prompt] + call.history.filter { $0.role == .user }.map(\.text)
+            + [call.instructions].compactMap { $0 }
+        var unchecked = Set<String>()
+        for text in userTexts {
+            unchecked.formUnion(SensitiveTextDetector.uncheckedParagraphs(in: text, hasNameModel: hasNameModel))
+        }
 
         var found = Set<RedactedEntity.ID>()
         var redacted = call
@@ -54,12 +73,22 @@ struct RedactionSession: Equatable, Sendable {
         } else {
             redacted.instructions = instructions
         }
-        return RedactedCall(call: redacted, entityIDs: found)
+        return RedactedCall(call: redacted, entityIDs: found, uncheckedParagraphs: unchecked)
     }
 
-    /// Whether any of `ids` still needs the user's review.
-    func hasUnreviewed(in ids: Set<RedactedEntity.ID>) -> Bool {
-        entities.contains { ids.contains($0.id) && $0.isReviewed == false }
+    /// `redact(_:)` without changing the session, for a call whose details are
+    /// already registered.
+    func redactedCopy(of call: OutboundCall) -> RedactedCall {
+        var copy = self
+        return copy.redact(call)
+    }
+
+    /// Whether `redacted` still needs the user's review: it holds a detail not
+    /// reviewed yet, or a paragraph whose names couldn't be checked that the
+    /// user hasn't seen.
+    func needsReview(_ redacted: RedactedCall) -> Bool {
+        let hasNewDetail = entities.contains { redacted.entityIDs.contains($0.id) && $0.isReviewed == false }
+        return hasNewDetail || redacted.uncheckedParagraphs.isSubset(of: reviewedUncheckedParagraphs) == false
     }
 
     /// `text` split into plain runs and details, for the review sheet.
@@ -87,7 +116,12 @@ struct RedactionSession: Equatable, Sendable {
         let segments = segments(of: call.prompt)
         let inPrompt = Set(segments.compactMap(\.entity?.id))
         let earlier = entities.filter { redacted.entityIDs.contains($0.id) && inPrompt.contains($0.id) == false }
-        return RedactionReview(segments: segments, earlierEntities: earlier, sentText: redacted.call.prompt)
+        return RedactionReview(
+            segments: segments,
+            earlierEntities: earlier,
+            sentText: redacted.call.prompt,
+            namesUnchecked: redacted.uncheckedParagraphs.isEmpty == false
+        )
     }
 
     // MARK: - Review choices
@@ -98,11 +132,13 @@ struct RedactionSession: Equatable, Sendable {
         entities[index].isRevealed.toggle()
     }
 
-    /// Marks every detail as reviewed, after the user sent.
-    mutating func markAllReviewed() {
+    /// Marks every detail as reviewed, and `call`'s unchecked paragraphs as
+    /// seen, after the user sent.
+    mutating func markReviewed(_ call: RedactedCall) {
         for index in entities.indices {
             entities[index].isReviewed = true
         }
+        reviewedUncheckedParagraphs.formUnion(call.uncheckedParagraphs)
     }
 
     /// Forgets details the user never sent, after "Keep on Device".

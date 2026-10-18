@@ -18,6 +18,12 @@ struct RedactionReviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading) {
                     Text(CloudConsentMessage.text(for: request.destination))
+                    if review.namesUnchecked {
+                        Label(CloudConsentMessage.namesUncheckedWarning, systemImage: "exclamationmark.triangle")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                            .padding(.vertical)
+                    }
                     if review.hasEntities {
                         Text(CloudConsentMessage.redactionHint)
                             .font(.footnote)

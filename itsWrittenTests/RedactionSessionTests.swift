@@ -20,7 +20,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testRedactsPromptHistoryAndInstructions() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         let redacted = session.redact(call(
             "Is marta@example.com still right?",
             instructions: "Sign as luca@example.com.",
@@ -34,7 +34,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testPlaceholdersAreStableAcrossCalls() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Mail marta@example.com"))
         let second = session.redact(call("Mail luca@example.com, then MARTA@example.com"))
         XCTAssertEqual(second.call.prompt, "Mail [EMAIL_2], then [EMAIL_1]")
@@ -45,7 +45,7 @@ final class RedactionSessionTests: XCTestCase {
             NLTagger.availableTagSchemes(for: .word, language: .english).contains(.nameType),
             "This runtime has no name-recognition model (the simulator ships without one)."
         )
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Yesterday Marta Rossi flew to London to start her new job at Barclays."))
         // Lowercase, the tagger doesn't see a name here, but the session knows it.
         let redacted = session.redact(call("ok", history: [.assistant("say hi to marta rossi")]))
@@ -53,7 +53,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testOnlyWholeWordsAreReplaced() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Yesterday Marta Rossi flew to London to start her new job at Barclays."))
         let redacted = session.redact(call("Martadella and Londoner aren't her, but Marta is."))
         XCTAssertTrue(redacted.call.prompt.contains("Martadella"))
@@ -61,7 +61,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testNothingToHideLeavesInstructionsAlone() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         let redacted = session.redact(call("How do I make risotto?", instructions: "Be brief."))
         XCTAssertEqual(redacted.call.prompt, "How do I make risotto?")
         XCTAssertEqual(redacted.call.instructions, "Be brief.")
@@ -69,7 +69,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testRevealedDetailIsSentAsIsWithoutTheNote() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Mail marta@example.com"))
         session.toggleReveal("[EMAIL_1]")
         let redacted = session.redact(call("Mail marta@example.com"))
@@ -79,20 +79,20 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testReviewStateAndDiscard() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         let first = session.redact(call("Mail marta@example.com"))
-        XCTAssertTrue(session.hasUnreviewed(in: first.entityIDs))
-        session.markAllReviewed()
-        XCTAssertFalse(session.hasUnreviewed(in: first.entityIDs))
+        XCTAssertTrue(session.needsReview(first))
+        session.markReviewed(first)
+        XCTAssertFalse(session.needsReview(first))
 
         let second = session.redact(call("Mail luca@example.com"))
-        XCTAssertTrue(session.hasUnreviewed(in: second.entityIDs))
+        XCTAssertTrue(session.needsReview(second))
         session.discardUnreviewed()
         XCTAssertEqual(session.entities.map(\.original), ["marta@example.com"])
     }
 
     func testRestoreToleratesRewrittenPlaceholders() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Mail marta@example.com"))
         XCTAssertEqual(session.restore("Sent to [EMAIL_1]."), "Sent to marta@example.com.")
         XCTAssertEqual(session.restore("[email_1]'s inbox"), "marta@example.com's inbox")
@@ -104,7 +104,7 @@ final class RedactionSessionTests: XCTestCase {
         for kind in RedactionKind.allCases {
             XCTAssertEqual(RedactionKind(placeholderPrefix: kind.placeholderPrefix.lowercased()), kind)
         }
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call(
             "marta@example.com +44 20 7946 0958 4111 1111 1111 1111 192.168.1.20 51.5074, -0.1278 SSN 123-45-6789"
         ))
@@ -115,7 +115,7 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testRestoreForDisplayHoldsBackPartialPlaceholders() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         _ = session.redact(call("Mail marta@example.com"))
         XCTAssertEqual(session.restoreForDisplay("Sent to [EMA"), "Sent to ")
         XCTAssertEqual(session.restoreForDisplay("Sent to [EMAIL_"), "Sent to ")
@@ -125,13 +125,13 @@ final class RedactionSessionTests: XCTestCase {
     }
 
     func testEmptySessionChangesNothing() {
-        let session = RedactionSession()
+        let session = RedactionSession(hasNameModel: { _ in true })
         XCTAssertEqual(session.restore("[PERSON_1]"), "[PERSON_1]")
         XCTAssertEqual(session.restoreForDisplay("Look at [this"), "Look at [this")
     }
 
     func testReviewSplitsPromptAndListsEarlierDetails() {
-        var session = RedactionSession()
+        var session = RedactionSession(hasNameModel: { _ in true })
         let request = call("Mail marta@example.com today", history: [.user("Or luca@example.com")])
         _ = session.redact(request)
         let review = session.review(of: request)
@@ -140,5 +140,25 @@ final class RedactionSessionTests: XCTestCase {
         XCTAssertEqual(review.earlierEntities.map(\.original), ["luca@example.com"])
         XCTAssertEqual(review.sentText, "Mail [EMAIL_1] today")
         XCTAssertTrue(review.hasEntities)
+    }
+
+    func testUncheckedUserTextNeedsReviewOnce() {
+        var session = RedactionSession(hasNameModel: { _ in true })
+        let japanese = "姉のマルタはモスクワに住んでいます。"
+        let first = session.redact(call(japanese))
+        XCTAssertEqual(first.uncheckedParagraphs, [japanese])
+        XCTAssertTrue(session.needsReview(first))
+        XCTAssertTrue(session.review(of: call(japanese)).namesUnchecked)
+
+        session.markReviewed(first)
+        let again = session.redact(call("Make it shorter", history: [.user(japanese)]))
+        XCTAssertFalse(session.needsReview(again))
+    }
+
+    func testVendorRepliesDontCountAsUnchecked() {
+        var session = RedactionSession(hasNameModel: { _ in true })
+        let redacted = session.redact(call("Make it shorter", history: [.assistant("姉のマルタはモスクワに住んでいます。")]))
+        XCTAssertTrue(redacted.uncheckedParagraphs.isEmpty)
+        XCTAssertFalse(session.needsReview(redacted))
     }
 }

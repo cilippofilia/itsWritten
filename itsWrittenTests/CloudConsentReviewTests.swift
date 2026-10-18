@@ -52,14 +52,14 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testVendorDowngradeIsLeftToReview() async {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let allowed = await coordinator.request(claudeDowngrade)
         XCTAssertTrue(allowed)
         XCTAssertNil(coordinator.pendingRequest)
     }
 
     func testOnDeviceAndPrivateCloudCallsPassUnchanged() async {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let onDevice = OutboundCall(prompt: "Hi Marta", instructions: nil, history: [], provider: .onDevice, privacyLevel: .onDevice)
         let appleCloud = OutboundCall(
             prompt: "Hi Marta", instructions: nil, history: [], provider: .privateCloudCompute, privacyLevel: .appleCloud
@@ -72,7 +72,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testUnknownExternalProviderIsBlocked() async {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let call = OutboundCall(prompt: "hi", instructions: nil, history: [], provider: ProviderIdentifier("x"), privacyLevel: .external)
         let result = await coordinator.review(call)
         XCTAssertNil(result)
@@ -80,7 +80,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testReviewShowsDetailsAndSendsRedacted() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Email marta.rossi@example.com today")) }
         await waitForPending(coordinator)
         let review = try XCTUnwrap(coordinator.pendingRequest?.review)
@@ -96,7 +96,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testReviewedDetailsDontAskAgainButNewOnesDo() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let first = Task { await coordinator.review(self.claudeCall("Write to marta@example.com")) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
@@ -120,7 +120,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testAlwaysAllowedStillReviewsNewDetails() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         coordinator.setAlwaysAllowed(true, for: .vendor(.anthropic))
         let plain = await coordinator.review(claudeCall("hello"))
         XCTAssertEqual(plain?.prompt, "hello")
@@ -135,7 +135,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testRevealedDetailIsSentAsIs() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com and call +44 20 7946 0958")) }
         await waitForPending(coordinator)
         let request = try XCTUnwrap(coordinator.pendingRequest)
@@ -149,7 +149,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testToggleForStaleRequestIsIgnored() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         let request = try XCTUnwrap(coordinator.pendingRequest)
@@ -160,7 +160,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testDeclineForgetsNewDetails() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: false)
@@ -170,7 +170,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testCoalescedCallsAreCheckedAgainAfterSend() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let first = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         let firstID = try XCTUnwrap(coordinator.pendingRequest?.id)
@@ -196,7 +196,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testCancelledReviewIsDeclinedAndForgetsDetails() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         task.cancel()
@@ -208,7 +208,7 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testResetForgetsDetails() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
@@ -221,12 +221,46 @@ final class CloudConsentReviewTests: XCTestCase {
     }
 
     func testRestorePutsWordsBack() async throws {
-        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
         let task = Task { await coordinator.review(self.claudeCall("Mail marta@example.com")) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         _ = await task.value
         XCTAssertEqual(coordinator.restore("Sent to [EMAIL_1]."), "Sent to marta@example.com.")
         XCTAssertEqual(coordinator.restoreForDisplay("Sent to [EMA"), "Sent to ")
+    }
+
+    func testUncheckedLanguageAlwaysAsksOncePerText() async throws {
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
+        coordinator.setAlwaysAllowed(true, for: .vendor(.anthropic))
+        let japanese = "姉のマルタはモスクワに住んでいます。"
+
+        let first = Task { await coordinator.review(self.claudeCall(japanese)) }
+        await waitForPending(coordinator)
+        XCTAssertEqual(coordinator.pendingRequest?.review?.namesUnchecked, true)
+        try answerShown(coordinator, allow: true)
+        let firstResult = await first.value
+        XCTAssertEqual(firstResult?.prompt, japanese)
+
+        // The same text (e.g. the title call) doesn't ask again.
+        let title = await coordinator.review(claudeCall(japanese))
+        XCTAssertEqual(title?.prompt, japanese)
+        XCTAssertNil(coordinator.pendingRequest)
+
+        // A new message in that language does.
+        let next = Task { await coordinator.review(self.claudeCall("妹のジュリアはミラノで働いています。")) }
+        await waitForPending(coordinator)
+        XCTAssertEqual(coordinator.pendingRequest?.review?.namesUnchecked, true)
+        try answerShown(coordinator, allow: false)
+        _ = await next.value
+    }
+
+    func testCheckedLanguageShowsNoWarning() async throws {
+        let coordinator = CloudConsentCoordinator(defaults: defaults, hasNameModel: { _ in true })
+        let task = Task { await coordinator.review(self.claudeCall("Please mail marta@example.com about the trip")) }
+        await waitForPending(coordinator)
+        XCTAssertEqual(coordinator.pendingRequest?.review?.namesUnchecked, false)
+        try answerShown(coordinator, allow: false)
+        _ = await task.value
     }
 }

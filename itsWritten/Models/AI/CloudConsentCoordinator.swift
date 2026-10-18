@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import NaturalLanguage
 import Observation
 import VoltaSDK
 
@@ -64,11 +65,19 @@ final class CloudConsentCoordinator {
     /// Destinations the user allowed during this conversation.
     @ObservationIgnored private var conversationGrants: Set<ConsentDestination> = []
     /// This conversation's personal details and their placeholders.
-    @ObservationIgnored private(set) var redaction = RedactionSession()
+    @ObservationIgnored private(set) var redaction: RedactionSession
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let hasNameModel: @Sendable (NLLanguage) -> Bool
 
-    init(defaults: UserDefaults = .standard) {
+    /// `hasNameModel` lets tests stand in for a device: the simulator has no
+    /// name model, so every message would count as unchecked.
+    init(
+        defaults: UserDefaults = .standard,
+        hasNameModel: @escaping @Sendable (NLLanguage) -> Bool = SensitiveTextDetector.hasNameModel
+    ) {
         self.defaults = defaults
+        self.hasNameModel = hasNameModel
+        self.redaction = RedactionSession(hasNameModel: hasNameModel)
     }
 
     /// The Volta outbound filter that sends every call through `review(_:)`.
@@ -147,12 +156,15 @@ final class CloudConsentCoordinator {
     func respond(to requestID: ConsentRequest.ID, allow: Bool) {
         guard let request = pendingRequest, request.id == requestID else { return }
         let waiters = currentWaiters
+        let shown = shownCall
         currentWaiters = []
         shownCall = nil
         pendingRequest = nil
         if allow {
             conversationGrants.insert(request.destination)
-            redaction.markAllReviewed()
+            if let shown {
+                redaction.markReviewed(redaction.redactedCopy(of: shown))
+            }
             for waiter in waiters {
                 guard let call = waiter.call else {
                     waiter.continuation.resume(returning: .allowed(nil))
@@ -184,7 +196,7 @@ final class CloudConsentCoordinator {
     /// waiting call.
     func resetConversationGrants() {
         conversationGrants.removeAll()
-        redaction = RedactionSession()
+        redaction = RedactionSession(hasNameModel: hasNameModel)
         let waiters = currentWaiters + queue.flatMap(\.waiters)
         currentWaiters = []
         shownCall = nil
@@ -233,7 +245,7 @@ final class CloudConsentCoordinator {
         guard isAllowedWithoutPrompt(destination) else { return nil }
         var draft = redaction
         let redacted = draft.redact(call)
-        guard draft.hasUnreviewed(in: redacted.entityIDs) == false else { return nil }
+        guard draft.needsReview(redacted) == false else { return nil }
         redaction = draft
         return redacted.call
     }

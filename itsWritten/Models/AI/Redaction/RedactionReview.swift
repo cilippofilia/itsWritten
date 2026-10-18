@@ -13,6 +13,9 @@ struct RedactionReview: Equatable, Sendable {
     let earlierEntities: [RedactedEntity]
     /// The message exactly as the model receives it.
     let sentText: String
+    /// Names in this conversation couldn't be checked automatically, so the
+    /// sheet says any names will be sent as written.
+    var namesUnchecked = false
 
     /// Whether anything in the call is hidden or could be.
     var hasEntities: Bool {
