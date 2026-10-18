@@ -8,53 +8,54 @@
 import SwiftUI
 
 struct AINotEnabledView: View {
+    @Environment(\.openURL) private var openURL
     @State private var showWhyAISheet: Bool = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: "apple.intelligence")
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: 60))
+            ScrollView {
+                VStack(spacing: 20) {
+                    Image(systemName: "apple.intelligence")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.largeTitle.scaled(by: 1.8))
+                        .accessibilityHidden(true)
 
-                Text("Apple Intelligence Required")
-                    .font(.title2)
-                    .bold()
+                    Text("Apple Intelligence Required")
+                        .font(.title2)
+                        .bold()
 
-                Text("This app requires Apple Intelligence to be enabled. Please enable it in Settings to continue.")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    Text("This app requires Apple Intelligence to be enabled. Please enable it in Settings to continue.")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-                Button(action: {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }) {
-                    Label("Open Settings", systemImage: "gear")
+                    Button("Open Settings", systemImage: "gear", action: openSettings)
+                        .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
+                .padding()
+                .readableContentWidth()
             }
-            .padding()
+            // Centered when it fits, scrollable when the window is short (iPhone Duo's
+            // outer display in landscape, large Dynamic Type).
+            .defaultScrollAnchor(.center, for: .alignment)
+            .scrollBounceBehavior(.basedOnSize)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    GlassEffectContainer {
-                        Button(action: {
-                            showWhyAISheet = true
-                        }) {
-                            Label("Why AI?", systemImage: "sparkles")
-                        }
-                    }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Why AI?", systemImage: "sparkles", action: presentWhyAI)
                 }
             }
-            .sheet(isPresented: $showWhyAISheet) {
-                WhyAIView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.ultraThinMaterial)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
+            .whyAISheet(isPresented: $showWhyAISheet)
         }
+    }
+
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            openURL(url)
+        }
+    }
+
+    private func presentWhyAI() {
+        showWhyAISheet = true
     }
 }
 

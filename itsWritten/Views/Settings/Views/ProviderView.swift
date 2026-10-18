@@ -9,8 +9,17 @@ import FoundationModels
 import SwiftUI
 
 struct ProviderView: View {
-    var model = AppLanguageModel.model
+    @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
+
+    var model = AppLanguageModel.model
+
+    /// Supported language names, sorted once per locale rather than on every render.
+    @State private var supportedLanguageNames: [String] = []
+
+    private var currentLanguage: Locale.Language {
+        locale.language
+    }
 
     var body: some View {
         Form {
@@ -18,25 +27,21 @@ struct ProviderView: View {
                 Label("Apple Intelligence", systemImage: "apple.intelligence")
                     .symbolRenderingMode(.multicolor)
             } footer: {
-                Text("Apple Intelligence runs entirely on your device, keeping your writing private and available even without an internet connection.")
+                Text("""
+                Apple Intelligence runs entirely on your device, keeping your writing private \
+                and available even without an internet connection.
+                """)
             }
 
-            let currentLanguage = Locale.current.language
-            let isSupported = model.supportedLanguages.contains(currentLanguage)
-
             Section {
-                Button {
-                    if let settingsURL = URL(string: "app-settings:") {
-                        openURL(settingsURL)
-                    }
-                } label: {
+                Button(action: openAppSettings) {
                     LabeledContent("Current Language") {
-                        Text(displayName(for: currentLanguage))
+                        Text(currentLanguage.displayName(in: locale))
                     }
                 }
                 .buttonStyle(.plain)
 
-                if isSupported {
+                if model.supportedLanguages.contains(currentLanguage) {
                     Label("Current language is supported", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
@@ -48,37 +53,29 @@ struct ProviderView: View {
             }
 
             Section("Supported Languages") {
-                ForEach(
-                    Array(model.supportedLanguages).sorted { displayName(for: $0) < displayName(for: $1) },
-                    id: \.self
-                ) { language in
-                    Text(displayName(for: language))
+                ForEach(supportedLanguageNames, id: \.self) { name in
+                    Text(name)
                 }
             }
         }
         .formStyle(.grouped)
         .navigationTitle("Provider")
+        .task(id: locale) {
+            supportedLanguageNames = model.supportedLanguages
+                .map { $0.displayName(in: locale) }
+                .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        }
     }
 
-    func displayName(for language: Locale.Language) -> String {
-        let scriptsToShow: Set<Locale.Script> = [.hanSimplified, .hanTraditional]
-        let scriptToUse = language.script.flatMap { scriptsToShow.contains($0) ? $0 : nil }
-
-        let components = Locale.Components(
-            languageCode: language.languageCode,
-            script: scriptToUse,
-            languageRegion: language.region
-        )
-        let locale = Locale(components: components)
-
-        if let name = Locale.current.localizedString(forIdentifier: locale.identifier) {
-            return name
+    private func openAppSettings() {
+        if let settingsURL = URL(string: "app-settings:") {
+            openURL(settingsURL)
         }
+    }
+}
 
-        if let code = language.languageCode?.identifier {
-            return Locale.current.localizedString(forLanguageCode: code) ?? code
-        }
-
-        return "Unknown"
+#Preview {
+    NavigationStack {
+        ProviderView()
     }
 }

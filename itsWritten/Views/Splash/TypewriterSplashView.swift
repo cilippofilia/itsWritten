@@ -22,7 +22,7 @@ struct TypewriterSplashView: View {
                     .font(.largeTitle)
                     .bold()
             }
-            Image("TypewriterIcon")
+            Image(.typewriterIcon)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 20)

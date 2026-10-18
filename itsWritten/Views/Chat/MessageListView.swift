@@ -36,6 +36,7 @@ struct MessageListView: View {
                 }
             }
             .padding()
+            .readableContentWidth()
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollIndicators(.hidden)

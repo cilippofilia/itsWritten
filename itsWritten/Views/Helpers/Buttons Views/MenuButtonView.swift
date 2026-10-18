@@ -7,64 +7,36 @@
 
 import SwiftUI
 
+/// The app menu in `HomeView`'s toolbar. A plain system `Menu` with a title and symbol,
+/// so the toolbar supplies its glass, overflow, and vertical-bar placement.
 struct MenuButtonView: View {
-    @Binding var showWhyAISheet: Bool
-    @Binding var showChatHistoryView: Bool
-    @Binding var showSettings: Bool
+    let showWhyAI: () -> Void
     let showOnboarding: () -> Void
+    let showHistory: () -> Void
+    let showSettings: () -> Void
+
+    /// Bumped each time a new-chat letter lands in this button.
+    var deliveryCount = 0
 
     var body: some View {
-        Menu {
-            whyAIButton
-            showOnboardingButton
+        Menu("Menu", systemImage: "line.3.horizontal") {
+            Button("Why AI?", systemImage: "sparkles", action: showWhyAI)
+            Button("Onboarding", systemImage: "book.pages", action: showOnboarding)
             Divider()
-            chatHistoryButton
-            settingsButton
-        } label: {
-            Label("Menu", systemImage: "line.3.horizontal")
-                .labelStyle(.iconOnly)
-                .frame(width: 50, height: 50)
+            Button("History", systemImage: "clock.arrow.circlepath", action: showHistory)
+            Button("Settings", systemImage: "gearshape", action: showSettings)
         }
         .menuOrder(.priority)
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive())
-    }
-}
-
-private extension MenuButtonView {
-    var whyAIButton: some View {
-        Button(action: {
-            showWhyAISheet = true
-        }) {
-            Label("Why AI?", systemImage: "sparkles")
-        }
-    }
-    var showOnboardingButton: some View {
-        Button(action: {
-            showOnboarding()
-        }) {
-            Label("Onboarding", systemImage: "book.pages")
-        }
-    }
-    var chatHistoryButton: some View {
-        Button(action: {
-            showChatHistoryView = true
-        }) {
-            Label("History", systemImage: "clock.arrow.circlepath")
-        }
-    }
-    var settingsButton: some View {
-        Button("Settings", systemImage: "gearshape") {
-            showSettings = true
-        }
+        .symbolEffect(.bounce, value: deliveryCount)
+        .sensoryFeedback(.impact(weight: .light), trigger: deliveryCount)
     }
 }
 
 #Preview {
     MenuButtonView(
-        showWhyAISheet: .constant(false),
-        showChatHistoryView: .constant(false),
-        showSettings: .constant(false),
-        showOnboarding: { }
+        showWhyAI: { },
+        showOnboarding: { },
+        showHistory: { },
+        showSettings: { }
     )
 }

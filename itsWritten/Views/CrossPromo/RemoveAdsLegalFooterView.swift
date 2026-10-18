@@ -8,34 +8,27 @@ import SwiftUI
 /// The Restore Purchase / Terms of Use / Privacy Policy row, pinned to the bottom of
 /// `CrossPromoRemoveAdsInfoView` via `.safeAreaInset(edge: .bottom)` so it stays on screen
 /// rather than scrolling away with the rest of the paywall.
+///
+/// Falls back to a stacked layout when the single row doesn't fit, such as in narrow
+/// windows or at large Dynamic Type sizes, instead of shrinking the text.
 struct RemoveAdsLegalFooterView: View {
-    @Environment(\.openURL) private var openURL
-
     let isRestoring: Bool
     let onRestore: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            if isRestoring {
-                ProgressView()
-                    .controlSize(.mini)
-            } else {
-                Button("Restore Purchase", action: onRestore)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                RestorePurchaseButton(isRestoring: isRestoring, onRestore: onRestore)
+                LegalSeparator()
+                RemoveAdsLegalLinksView()
             }
 
-            Text("•")
-                .foregroundStyle(.tertiary)
-
-            Button("Terms of Use") { openURL(RemoveAdsLegalLinks.termsOfUse) }
-
-            Text("•")
-                .foregroundStyle(.tertiary)
-
-            Button("Privacy Policy") { openURL(RemoveAdsLegalLinks.privacyPolicy) }
+            VStack(spacing: DesignConstants.Spacing.small) {
+                RestorePurchaseButton(isRestoring: isRestoring, onRestore: onRestore)
+                RemoveAdsLegalLinksView()
+            }
         }
-        .font(.caption)
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .font(.footnote)
         .frame(maxWidth: .infinity)
     }
 }

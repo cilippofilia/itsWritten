@@ -36,7 +36,7 @@ struct ContactSection: View {
             .buttonStyle(.plain)
             .sheet(isPresented: $showRemoveAdsPaywall) {
                 CrossPromoRemoveAdsInfoView()
-                    .presentationDetents([.medium])
+                    .presentationDetents([.medium, .large])
             }
 
             Button {

@@ -31,7 +31,10 @@ struct ComposingView: View {
                 CountdownView()
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .readableContentWidth()
+        // `safeAreaBar` reserves space for the footer and gives the editor the system
+        // scroll-edge treatment underneath it.
+        .safeAreaBar(edge: .bottom) {
             VStack(spacing: 0) {
                 // Hidden while composing: keeps the ad out of the way of the keyboard, and
                 // avoids reasoning about how an ad's own internal animations interact with
@@ -45,6 +48,7 @@ struct ComposingView: View {
                     isResponding: viewModel.session.isResponding,
                     sendAction: sendAction
                 )
+                .readableContentWidth()
             }
         }
     }

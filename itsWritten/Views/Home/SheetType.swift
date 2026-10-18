@@ -6,46 +6,12 @@
 //
 
 import Foundation
-import FoundationModels
-import SwiftUI
 
-enum SheetType: Identifiable, Equatable {
+/// Sheets presented from `HomeView`. Holds no data: `HomeSheetView` reads the settings it
+/// edits from bindings supplied when the sheet is built.
+enum SheetType: String, Identifiable {
     case whyAI
-    case settings(Binding<ModelConfiguration>, Binding<ModelResponseType>)
+    case settings
 
-    var id: String {
-        switch self {
-        case .whyAI:
-            return "whyAI"
-        case .settings:
-            return "settings"
-        }
-    }
-
-    @ViewBuilder
-    var view: some View {
-        switch self {
-        case .whyAI:
-            WhyAIView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.ultraThinMaterial)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-
-        case .settings(let config, let responseType):
-            NavigationStack {
-                ModelSettingsSheet(
-                    configuration: config,
-                    responseType: responseType
-                )
-            }
-            .background(.ultraThinMaterial)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
-    }
-
-    static func == (lhs: SheetType, rhs: SheetType) -> Bool {
-        return lhs.id == rhs.id
-    }
+    var id: String { rawValue }
 }
