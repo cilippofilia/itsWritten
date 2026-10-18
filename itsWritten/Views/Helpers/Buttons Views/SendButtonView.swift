@@ -14,29 +14,20 @@ struct SendButtonView: View {
 
     var body: some View {
         GlassEffectContainer {
-            Button(action: {
-                sendAction()
-            }) {
-                Color.clear
-                    .contentShape(.rect)
-                    .overlay {
-                        if isResponding == true {
-                            ProgressView()
-                                .frame(width: 20, height: 20)
-                        } else {
-                            HStack(alignment: .center, spacing: 10) {
-                                Image(systemName: "paperplane")
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-
-                                Text("Send")
-                            }
-                        }
+            Button(action: sendAction) {
+                Group {
+                    if isResponding {
+                        ProgressView()
+                            .accessibilityLabel("Responding")
+                    } else {
+                        Label("Send", systemImage: "paperplane")
                     }
+                }
+                .frame(maxWidth: .infinity, minHeight: 55)
+                .contentShape(.rect)
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .frame(height: 55)
+            .keyboardShortcut(.return, modifiers: .command)
+            .padding(.horizontal)
             .foregroundStyle(.white)
             .glassEffect(.regular.tint(isResponding || isInputEmpty ? .secondary : .blue).interactive())
             .animation(.easeInOut, value: isResponding)

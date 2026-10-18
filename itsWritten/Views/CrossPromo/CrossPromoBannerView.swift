@@ -33,7 +33,7 @@ struct CrossPromoBannerView: View {
         }
         .sheet(isPresented: $showRemoveAdsPaywall) {
             CrossPromoRemoveAdsInfoView()
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
         }
     }
 

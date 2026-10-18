@@ -21,9 +21,7 @@ struct CrossPromoRemoveAdsInfoView: View {
             content
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            dismiss()
-                        }
+                        Button("Done", action: dismiss.callAsFunction)
                     }
                 }
         }
@@ -38,36 +36,43 @@ struct CrossPromoRemoveAdsInfoView: View {
                 Text("Thanks for your support — you won't see these cross-promo ads again.")
             }
         } else {
-            VStack(spacing: 24) {
-                VStack(spacing: 12) {
-                    RemoveAdsBadge()
-                        .clipShape(.circle)
+            // Scrolls so the product and Restore Purchase stay reachable in short windows,
+            // such as a medium detent on iPhone Duo's outer display.
+            ScrollView {
+                VStack(spacing: DesignConstants.Spacing.large) {
+                    VStack(spacing: DesignConstants.Spacing.medium) {
+                        RemoveAdsBadge()
+                            .clipShape(.circle)
 
-                    Text("Remove Ads")
-                        .font(.title2)
-                        .bold()
+                        Text("Remove Ads")
+                            .font(.title2)
+                            .bold()
 
-                    Text("These occasional promos are for my other apps. Remove them for good with a small one-time purchase.")
+                        Text("""
+                        These occasional promos are for my other apps. \
+                        Remove them for good with a small one-time purchase.
+                        """)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-
-                ProductView(id: RemoveAdsStore.removeAdsProductID)
-                    .productViewStyle(.compact)
+                    }
                     .padding(.horizontal)
 
-                if let restoreError = removeAdsStore.restoreError {
-                    Text(restoreError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
+                    ProductView(id: RemoveAdsStore.removeAdsProductID)
+                        .productViewStyle(.compact)
                         .padding(.horizontal)
-                }
 
-                Spacer()
+                    if let restoreError = removeAdsStore.restoreError {
+                        Text(restoreError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                }
+                .padding(.top, 32)
+                .readableContentWidth()
             }
-            .padding(.top, 32)
+            .scrollBounceBehavior(.basedOnSize)
             .safeAreaInset(edge: .bottom) {
                 RemoveAdsLegalFooterView(isRestoring: isRestoring, onRestore: restore)
                     .padding()

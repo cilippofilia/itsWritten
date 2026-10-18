@@ -65,11 +65,11 @@ struct ModelConfiguration: Equatable {
     var generationOptions: GenerationOptions {
         switch samplingType {
         case .greedy:
-            .init(sampling: .greedy, temperature: temperature)
+            .init(samplingMode: .greedy, temperature: temperature)
         case .topK:
-            .init(sampling: .random(top: Int(topK)), temperature: temperature)
+            .init(samplingMode: .random(top: Int(topK)), temperature: temperature)
         case .topP:
-            .init(sampling: .random(probabilityThreshold: topP), temperature: temperature)
+            .init(samplingMode: .random(probabilityThreshold: topP), temperature: temperature)
         }
     }
 }

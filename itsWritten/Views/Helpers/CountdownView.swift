@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CountdownView: View {
-    @Environment(CountdownViewModel.self) var viewModel
+    @Environment(CountdownViewModel.self) private var viewModel
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.0)) { context in

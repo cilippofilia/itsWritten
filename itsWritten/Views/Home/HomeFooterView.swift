@@ -13,7 +13,7 @@ struct HomeFooterView: View {
     let sendAction: () -> Void
 
     private var isInputEmpty: Bool {
-        text.isEmpty
+        text.isReallyEmpty
     }
 
     var body: some View {
@@ -28,7 +28,7 @@ struct HomeFooterView: View {
             TimerMenuButtonView()
         }
         .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.bottom, DesignConstants.Spacing.small)
     }
 }
 

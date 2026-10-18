@@ -7,31 +7,24 @@
 
 import Foundation
 
-enum AlertType: Identifiable {
+enum AlertType: String, Identifiable {
     case timeUp
 
-    var id: String {
+    var id: String { rawValue }
+
+    var title: LocalizedStringResource {
         switch self {
-        case .timeUp:
-            return "timeUp"
+        case .timeUp: "Time's Up!"
         }
     }
 
-    var title: String {
+    var message: LocalizedStringResource {
         switch self {
-        case .timeUp:
-            return "Time's Up!"
+        case .timeUp: "Your countdown timer has finished."
         }
     }
 
-    var message: String {
-        switch self {
-        case .timeUp:
-            return "Your countdown timer has finished."
-        }
-    }
-
-    var buttonText: String {
+    var buttonText: LocalizedStringResource {
         "OK"
     }
 }
