@@ -91,4 +91,38 @@ final class AIProviderStoreTests: XCTestCase {
         let store = AIProviderStore(orchestrator: orchestrator, consent: makeConsent())
         XCTAssertTrue(store.onDeviceOrchestrator === orchestrator)
     }
+
+    func testSimulatedOnDeviceUnavailableKeepsOnDeviceAsBaseline() async {
+        let config = AIProviderStore.configuration(
+            keys: [.anthropic: "a"], consent: makeConsent(), simulateOnDeviceUnavailable: true
+        )
+        XCTAssertNotNil(config.outboundFilter)
+        let first = await AIOrchestrator(configuration: config).providerStatuses().first
+        XCTAssertEqual(first?.identifier, .onDevice)
+        XCTAssertEqual(first?.privacyLevel, .onDevice)
+        guard case .unavailable = first?.availability else {
+            return XCTFail("Expected on-device to report unavailable")
+        }
+    }
+
+    func testOnDeviceConfigurationIgnoresSimulation() {
+        let base = AIProviderStore.configuration(keys: [:], consent: makeConsent(), simulateOnDeviceUnavailable: true)
+        XCTAssertFalse(AIProviderStore.onDeviceConfiguration(from: base).simulateOnDeviceUnavailable)
+    }
+
+    #if DEBUG
+    func testSimulationTogglePersistsAndRebuildsOrchestrator() throws {
+        let suite = "AIProviderStoreTests.simulation"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let store = AIProviderStore(keyStore: InMemoryAPIKeyStore(), consent: makeConsent(), defaults: defaults)
+        XCTAssertFalse(store.simulatesOnDeviceUnavailable)
+        let before = store.orchestrator
+        store.simulatesOnDeviceUnavailable = true
+        XCTAssertFalse(store.orchestrator === before)
+        let reloaded = AIProviderStore(keyStore: InMemoryAPIKeyStore(), consent: makeConsent(), defaults: defaults)
+        XCTAssertTrue(reloaded.simulatesOnDeviceUnavailable)
+        defaults.removePersistentDomain(forName: suite)
+    }
+    #endif
 }

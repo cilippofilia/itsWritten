@@ -12,6 +12,9 @@ struct CloudModelsView: View {
         Form {
             CloudPrivacySection()
             CloudKeysSection()
+            #if DEBUG
+            DebugFallbackSection()
+            #endif
         }
         .formStyle(.grouped)
         .navigationTitle("Cloud Models")

@@ -36,18 +36,41 @@ final class AIProviderStore {
     /// Whether at least one cloud vendor can serve as a fallback.
     var hasCloudFallback: Bool { !configuredVendors.isEmpty }
 
+    #if DEBUG
+    /// Debug only: on-device stays first in the chain but reports itself
+    /// unavailable, so a chat message falls back to PCC or a cloud key on a
+    /// device where Apple Intelligence works. Persisted across launches.
+    var simulatesOnDeviceUnavailable: Bool {
+        didSet {
+            defaults.set(simulatesOnDeviceUnavailable, forKey: Self.simulateOnDeviceUnavailableKey)
+            rebuildOrchestrators()
+        }
+    }
+
+    static let simulateOnDeviceUnavailableKey = "debugSimulateOnDeviceUnavailable"
+    #endif
+
     @ObservationIgnored private let keyStore: (any APIKeyStoring)?
+    @ObservationIgnored private let defaults: UserDefaults
 
     init(
         keyStore: any APIKeyStoring = KeychainAPIKeyStore(),
-        consent: CloudConsentCoordinator? = nil
+        consent: CloudConsentCoordinator? = nil,
+        defaults: UserDefaults = .standard
     ) {
         let consent = consent ?? CloudConsentCoordinator()
         self.keyStore = keyStore
         self.consent = consent
+        self.defaults = defaults
         let keys = Self.storedKeys(in: keyStore)
         self.configuredVendors = Set(keys.keys)
+        #if DEBUG
+        let simulates = defaults.bool(forKey: Self.simulateOnDeviceUnavailableKey)
+        self.simulatesOnDeviceUnavailable = simulates
+        let configuration = Self.configuration(keys: keys, consent: consent, simulateOnDeviceUnavailable: simulates)
+        #else
         let configuration = Self.configuration(keys: keys, consent: consent)
+        #endif
         self.orchestrator = AIOrchestrator(configuration: configuration)
         self.onDeviceOrchestrator = AIOrchestrator(configuration: Self.onDeviceConfiguration(from: configuration))
     }
@@ -62,7 +85,11 @@ final class AIProviderStore {
         configuredVendors: Set<CloudVendor> = []
     ) {
         self.keyStore = nil
+        self.defaults = .standard
         self.consent = consent
+        #if DEBUG
+        self.simulatesOnDeviceUnavailable = false
+        #endif
         self.orchestrator = orchestrator
         self.onDeviceOrchestrator = onDeviceOrchestrator ?? orchestrator
         self.configuredVendors = configuredVendors
@@ -85,15 +112,18 @@ final class AIProviderStore {
     }
 
     /// Builds the orchestrator configuration for the given keys.
+    /// `simulateOnDeviceUnavailable` is a testing aid; the app only sets it in debug builds.
     static func configuration(
         keys: [CloudVendor: String],
-        consent: CloudConsentCoordinator
+        consent: CloudConsentCoordinator,
+        simulateOnDeviceUnavailable: Bool = false
     ) -> AIConfiguration {
         var configuration = AIConfiguration()
         configuration.enableOnDevice = true
         if #available(iOS 26.0, *) {
             configuration.onDeviceModel = AppLanguageModel.model
         }
+        configuration.simulateOnDeviceUnavailable = simulateOnDeviceUnavailable
         configuration.enablePrivateCloudCompute = true
         configuration.preference = .preferOnDevice
         configuration.developerKey = nil
@@ -108,9 +138,11 @@ final class AIProviderStore {
     }
 
     /// Derives a configuration that only ever uses the on-device model: no cloud
-    /// accounts, no Private Cloud Compute, `.onDeviceOnly` preference.
+    /// accounts, no Private Cloud Compute, `.onDeviceOnly` preference. It always uses
+    /// the real on-device model, even while the debug simulation is on.
     static func onDeviceConfiguration(from configuration: AIConfiguration) -> AIConfiguration {
         var onDevice = configuration
+        onDevice.simulateOnDeviceUnavailable = false
         onDevice.preference = .onDeviceOnly
         onDevice.userAccounts = []
         onDevice.enablePrivateCloudCompute = false
@@ -120,9 +152,21 @@ final class AIProviderStore {
     private func update(_ key: String?, for vendor: CloudVendor) throws {
         guard let keyStore else { throw AIProviderStoreError.keyStoreUnavailable }
         try keyStore.setKey(key, for: vendor)
+        rebuildOrchestrators()
+    }
+
+    /// Rebuilds both orchestrators from the stored keys. No-op without a key store.
+    private func rebuildOrchestrators() {
+        guard let keyStore else { return }
         let keys = Self.storedKeys(in: keyStore)
         configuredVendors = Set(keys.keys)
+        #if DEBUG
+        let configuration = Self.configuration(
+            keys: keys, consent: consent, simulateOnDeviceUnavailable: simulatesOnDeviceUnavailable
+        )
+        #else
         let configuration = Self.configuration(keys: keys, consent: consent)
+        #endif
         orchestrator = AIOrchestrator(configuration: configuration)
         onDeviceOrchestrator = AIOrchestrator(configuration: Self.onDeviceConfiguration(from: configuration))
     }
