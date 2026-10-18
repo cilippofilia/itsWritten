@@ -21,9 +21,15 @@ struct LaunchView: View {
                 .transition(.move(edge: .leading).combined(with: .opacity))
                 .zIndex(1)
             } else {
-                AvailabilityView()
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-                    .zIndex(0)
+                Group {
+                    if #available(iOS 26.0, *) {
+                        AvailabilityView()
+                    } else {
+                        OSNotSupportedView()
+                    }
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .zIndex(0)
             }
         }
         .background(.background)

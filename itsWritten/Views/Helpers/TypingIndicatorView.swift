@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct TypingIndicatorView: View {
     @State private var phase = 0
 
@@ -37,6 +38,7 @@ struct TypingIndicatorView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     TypingIndicatorView()
         .padding()

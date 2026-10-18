@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ChatConversationView: View {
     @Environment(ConversationViewModel.self) private var viewModel
     @Environment(HomeViewModel.self) private var homeViewModel
@@ -40,9 +41,6 @@ struct ChatConversationView: View {
         .hideSensitiveData()
         #endif
         .navigationTitle(viewModel.title)
-        .onChange(of: config.instructions) {
-            viewModel.rebuildSession(config: config)
-        }
     }
 
     private func sendMessage() {
@@ -53,6 +51,7 @@ struct ChatConversationView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         ChatConversationView(

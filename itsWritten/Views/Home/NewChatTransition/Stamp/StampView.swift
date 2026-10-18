@@ -9,6 +9,7 @@ import SwiftUI
 
 /// A small postage stamp bearing the app icon: perforated white paper with the icon as
 /// its picture. The fixed light colors read on both light and dark letters.
+@available(iOS 26.0, *)
 struct StampView: View {
     var body: some View {
         ZStack {
@@ -41,6 +42,7 @@ struct StampView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     StampView()
         .padding()

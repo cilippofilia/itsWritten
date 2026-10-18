@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct GenerationView: View {
     @Binding var configuration: ModelConfiguration
     @Binding var responseType: ModelResponseType

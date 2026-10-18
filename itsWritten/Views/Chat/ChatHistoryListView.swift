@@ -8,6 +8,7 @@
 import SwiftUI
 
 /// The list of saved threads, with swipe-to-delete.
+@available(iOS 26.0, *)
 struct ChatHistoryListView: View {
     let threads: [ChatThread]
     let onSelect: (ChatThread) -> Void
@@ -31,6 +32,7 @@ struct ChatHistoryListView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     ChatHistoryListView(threads: ChatThread.sampleThreads, onSelect: { _ in }, onDelete: { _ in })
 }

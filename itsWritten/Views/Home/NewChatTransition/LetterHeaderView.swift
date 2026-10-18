@@ -8,6 +8,7 @@
 import SwiftUI
 
 /// The conversation title at the top of the letter, placed where the screen shows it.
+@available(iOS 26.0, *)
 struct LetterHeaderView: View {
     let title: String
     let alignment: HorizontalAlignment
@@ -21,6 +22,7 @@ struct LetterHeaderView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     LetterHeaderView(title: "Morning pages", alignment: .center)
         .frame(height: 54)

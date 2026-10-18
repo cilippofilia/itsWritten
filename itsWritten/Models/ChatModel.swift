@@ -35,6 +35,13 @@ final class ChatMessage: Identifiable {
     var timestamp: Date
     var toolNames: [String] = []
     var toolSources: [ChatMessageSource] = []
+    /// Display name of the cloud model that wrote this reply, or `nil` when it was
+    /// written on device (or by the user).
+    var providerName: String?
+    /// Set on a user message whose turn ended in an on-device guardrail failure.
+    /// Blocked turns are left out of every later history, so that content is never
+    /// sent anywhere, the cloud included.
+    var wasBlocked: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -42,7 +49,9 @@ final class ChatMessage: Identifiable {
         isUser: Bool,
         timestamp: Date = .now,
         toolNames: [String] = [],
-        toolSources: [ChatMessageSource] = []
+        toolSources: [ChatMessageSource] = [],
+        providerName: String? = nil,
+        wasBlocked: Bool = false
     ) {
         self.id = id
         self.content = content
@@ -50,6 +59,8 @@ final class ChatMessage: Identifiable {
         self.timestamp = timestamp
         self.toolNames = toolNames
         self.toolSources = toolSources
+        self.providerName = providerName
+        self.wasBlocked = wasBlocked
     }
 }
 

@@ -10,6 +10,7 @@ import SwiftUI
 /// One third of the letter: the full letter, clipped to its slice. Only the letter's outer
 /// corners are rounded and only its outer edges outlined, so the flat letter reads as one
 /// sheet, with an edge that stands out against dark backgrounds.
+@available(iOS 26.0, *)
 struct LetterPanelView: View {
     let face: LetterFace
     let size: CGSize

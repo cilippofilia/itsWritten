@@ -30,7 +30,7 @@ enum DesignConstants {
     }
 
     enum CornerRadius {
-        static let card: Double = 12
+        static let card: Double = 24
         static let bubble: Double = 18
         static let panel: Double = 28
     }

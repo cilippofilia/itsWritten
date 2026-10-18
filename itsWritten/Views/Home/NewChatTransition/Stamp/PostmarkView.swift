@@ -9,6 +9,7 @@ import SwiftUI
 
 /// A cancellation mark: a double ring with wavy lines trailing off to one side,
 /// overlapping the stamp's leading edge, printed in worn red or blue ink.
+@available(iOS 26.0, *)
 struct PostmarkView: View {
     let ink: PostmarkInk
 
@@ -35,6 +36,7 @@ struct PostmarkView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     VStack(spacing: 20) {
         PostmarkView(ink: .red, wearSeed: 1)

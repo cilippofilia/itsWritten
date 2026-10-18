@@ -10,6 +10,7 @@ import SwiftUI
 /// that paywall: a one-time, non-consumable purchase that silences the cross-promo ads for good.
 /// `ProductView`'s `.compact` style supplies the purchase button sized for exactly one product;
 /// Restore Purchase and the legal links are pinned in a bottom safe-area inset.
+@available(iOS 26.0, *)
 struct CrossPromoRemoveAdsInfoView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoveAdsStore.self) private var removeAdsStore
@@ -94,6 +95,7 @@ struct CrossPromoRemoveAdsInfoView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     CrossPromoRemoveAdsInfoView()
         .environment(RemoveAdsStore())

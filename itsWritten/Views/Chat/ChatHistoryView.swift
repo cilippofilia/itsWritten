@@ -10,6 +10,7 @@ import SwiftUI
 
 /// Saved conversations. Shown as the sidebar of `HomeView`'s split view: beside the
 /// conversation in wide windows, and as the screen behind it in narrow ones.
+@available(iOS 26.0, *)
 struct ChatHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ChatThread.lastUpdated, order: .reverse) private var chatThreads: [ChatThread]
@@ -98,6 +99,7 @@ struct ChatHistoryView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         ChatHistoryView(onSelect: { _ in })

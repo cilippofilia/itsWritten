@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct WhyAIView: View {
     private let appleIntelligenceURL = URL(string: "https://www.apple.com/apple-intelligence/")
 
@@ -55,6 +56,7 @@ struct WhyAIView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     WhyAIView()
 }

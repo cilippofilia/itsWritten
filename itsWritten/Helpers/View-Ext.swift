@@ -20,6 +20,7 @@ extension View {
     }
 
     /// Presents the "Why AI?" explanation as a resizable sheet.
+    @available(iOS 26.0, *)
     func whyAISheet(isPresented: Binding<Bool>) -> some View {
         sheet(isPresented: isPresented) {
             WhyAIView()

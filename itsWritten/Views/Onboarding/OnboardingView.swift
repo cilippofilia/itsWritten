@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct OnboardingView: View {
     let onFinish: () -> Void
 
@@ -102,6 +103,7 @@ struct OnboardingView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     OnboardingView(onFinish: {})
 }

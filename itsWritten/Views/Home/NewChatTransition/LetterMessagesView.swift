@@ -8,6 +8,7 @@
 import SwiftUI
 
 /// The letter's message bubbles, laid out like `MessageListView`.
+@available(iOS 26.0, *)
 struct LetterMessagesView: View {
     let messages: [ChatMessage]
 

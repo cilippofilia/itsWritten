@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Rotates one third of the letter around a crease. Past 90° the panel shows the plain
 /// back of the paper, and a shadow deepens toward the crease mid-fold.
+@available(iOS 26.0, *)
 @Animatable
 struct FoldPanelModifier: ViewModifier {
     /// 0 (flat) to 180 (folded over the middle third).

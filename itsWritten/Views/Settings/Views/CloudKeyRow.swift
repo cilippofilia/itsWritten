@@ -1,0 +1,102 @@
+//
+//  CloudKeyRow.swift
+//  itsWritten
+//
+
+import SwiftUI
+import VoltaSDK
+
+/// Key entry for a single cloud vendor.
+@available(iOS 26.0, *)
+struct CloudKeyRow: View {
+    let vendor: CloudVendor
+
+    @Environment(AIProviderStore.self) private var aiProvider
+
+    /// Held only until Save; cleared afterwards and never stored elsewhere.
+    @State private var draftKey = ""
+    @State private var errorMessage: String?
+    /// Mirrors the coordinator's UserDefaults-backed value, which isn't observable.
+    @State private var isAlwaysAllowed = false
+
+    var body: some View {
+        let destination = ConsentDestination.vendor(vendor)
+        let hasKey = aiProvider.hasKey(for: vendor)
+
+        LabeledContent(destination.displayName) {
+            Text(hasKey ? "Key saved" : "No key")
+                .foregroundStyle(.secondary)
+        }
+        .onAppear {
+            isAlwaysAllowed = aiProvider.consent.isAlwaysAllowed(destination)
+        }
+
+        // No `.textContentType(.password)`: API keys shouldn't be offered to iCloud Keychain.
+        SecureField("API Key", text: $draftKey)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onChange(of: draftKey) {
+                errorMessage = nil
+            }
+
+        Button("Save", action: save)
+            .disabled(draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        if hasKey {
+            Button("Remove", role: .destructive, action: remove)
+        }
+
+        if let errorMessage {
+            Text(errorMessage)
+                .foregroundStyle(.red)
+        }
+
+        if let apiKeyPageURL = vendor.apiKeyPageURL {
+            Link("Get an API key", destination: apiKeyPageURL)
+        }
+
+        if hasKey {
+            Toggle("Always Allow", isOn: alwaysAllowed(for: destination))
+        }
+    }
+
+    private func save() {
+        do {
+            try aiProvider.setKey(draftKey, for: vendor)
+            draftKey = ""
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't save the key. Try again."
+        }
+    }
+
+    private func remove() {
+        do {
+            try aiProvider.removeKey(for: vendor)
+            aiProvider.consent.setAlwaysAllowed(false, for: .vendor(vendor))
+            isAlwaysAllowed = false
+            draftKey = ""
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't remove the key. Try again."
+        }
+    }
+
+    private func alwaysAllowed(for destination: ConsentDestination) -> Binding<Bool> {
+        Binding(
+            get: { isAlwaysAllowed },
+            set: { newValue in
+                aiProvider.consent.setAlwaysAllowed(newValue, for: destination)
+                isAlwaysAllowed = newValue
+            }
+        )
+    }
+}
+
+@available(iOS 26.0, *)
+#Preview {
+    Form {
+        CloudKeyRow(vendor: .openAI)
+    }
+    .environment(AIProviderStore())
+}

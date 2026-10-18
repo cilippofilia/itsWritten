@@ -7,6 +7,7 @@
 
 import Foundation
 
+@available(iOS 26.0, *)
 enum MedicalPromptAnalyzer {
     private static let medicalKeywords = Set([
         "adhd", "anxiety", "arthritis", "asthma", "blood", "bp", "cancer", "cholesterol",

@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ChatHistoryRowView: View {
     let thread: ChatThread
 
@@ -33,12 +34,16 @@ struct ChatHistoryRowView: View {
             Text(thread.lastUpdated, format: .dateTime.day().month(.twoDigits).year(.twoDigits).hour().minute())
                 .foregroundStyle(.secondary)
                 .font(.footnote)
+                .padding(.trailing)
         }
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     if let thread = ChatThread.sampleThreads.first {
         ChatHistoryRowView(thread: thread)
+            .padding(.horizontal, 4)
+            .preferredColorScheme(.dark)
     }
 }

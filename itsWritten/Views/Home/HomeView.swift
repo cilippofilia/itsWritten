@@ -16,6 +16,7 @@ import SwiftUI
 /// display) history is a sidebar beside it; in narrow ones it's pushed from the menu, as on
 /// iPhone. One `NavigationSplitView` serves every width, so opening or closing iPhone Duo,
 /// or resizing a window, changes the layout without resetting the conversation.
+@available(iOS 26.0, *)
 struct HomeView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
@@ -24,6 +25,7 @@ struct HomeView: View {
     @Environment(CrossPromoSignal.self) private var crossPromoSignal
     @Environment(RemoveAdsStore.self) private var removeAdsStore
     @Environment(PubMedToolStore.self) private var pubMedStore
+    @Environment(AIProviderStore.self) private var aiProvider
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -127,6 +129,7 @@ struct HomeView: View {
         }
         .environment(conversationViewModel)
         .environment(newChatTransition)
+        .cloudConsentAlert(aiProvider.consent)
         // A PrivateAds cross-promo ad every 3rd new chat started (see `CrossPromoSignal`,
         // bumped from `ConversationViewModel.persistCurrentTurn` when a brand-new thread is
         // first saved). The interstitial waits for the user to return to the composer
@@ -157,7 +160,8 @@ struct HomeView: View {
         conversationViewModel.configure(
             modelContext: modelContext,
             pubMedStore: pubMedStore,
-            crossPromoSignal: crossPromoSignal
+            crossPromoSignal: crossPromoSignal,
+            aiProvider: aiProvider
         )
         conversationViewModel.prewarmIdleSession(config: config)
     }
@@ -216,6 +220,7 @@ struct HomeView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     HomeView()
         .environment(HomeViewModel())
@@ -223,5 +228,6 @@ struct HomeView: View {
         .environment(CrossPromoSignal())
         .environment(RemoveAdsStore())
         .environment(PubMedToolStore.shared)
+        .environment(AIProviderStore())
         .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

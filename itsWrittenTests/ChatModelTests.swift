@@ -8,6 +8,7 @@
 import XCTest
 @testable import itsWritten
 
+@available(iOS 26.0, *)
 final class ChatModelTests: XCTestCase {
     func testCodableRoundTrip() throws {
         let id = UUID(uuidString: "A8A6D8B1-75D6-4F9F-8A2A-2168C1F1E5F1")!
@@ -56,6 +57,12 @@ final class ChatModelTests: XCTestCase {
 
         XCTAssertTrue(message.toolNames.isEmpty)
         XCTAssertTrue(message.toolSources.isEmpty)
+    }
+
+    func testChatMessageDefaultsToNoProviderName() {
+        let message = ChatMessage(content: "Hello", isUser: false)
+
+        XCTAssertNil(message.providerName)
     }
 
     func testMedicalPromptAnalyzerDefaultsToHumansWhenPopulationIsMissing() {

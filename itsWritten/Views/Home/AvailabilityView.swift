@@ -8,8 +8,9 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct AvailabilityView: View {
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @Environment(AIProviderStore.self) private var aiProvider
     @State private var homeVM = HomeViewModel()
     @State private var countDownVM = CountdownViewModel()
     @State private var model: SystemLanguageModel?
@@ -18,30 +19,27 @@ struct AvailabilityView: View {
         Group {
             switch model?.availability {
             case .available:
-                ZStack {
-                    if hasCompletedOnboarding {
-                        HomeView()
-                            .environment(homeVM)
-                            .environment(countDownVM)
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                    } else {
-                        OnboardingView {
-                            withAnimation(.easeInOut) {
-                                hasCompletedOnboarding = true
-                            }
-                        }
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+                ReadyContentView(homeVM: homeVM, countDownVM: countDownVM)
+            case .unavailable(let reason):
+                if aiProvider.hasCloudFallback {
+                    // No on-device model, but a cloud key can answer.
+                    ReadyContentView(homeVM: homeVM, countDownVM: countDownVM)
+                } else {
+                    switch reason {
+                    case .modelNotReady:
+                        ModelNotReadyView(action: {
+                            model = AppLanguageModel.model
+                        })
+                    case .appleIntelligenceNotEnabled:
+                        AINotEnabledView()
+                    case .deviceNotEligible:
+                        DeviceNotSupportedView()
+                    @unknown default:
+                        UnknownReasonView(action: {
+                            model = AppLanguageModel.model
+                        })
                     }
                 }
-                .animation(.easeInOut, value: hasCompletedOnboarding)
-            case .unavailable(.modelNotReady):
-                ModelNotReadyView(action: {
-                    model = AppLanguageModel.model
-                })
-            case .unavailable(.appleIntelligenceNotEnabled):
-                AINotEnabledView()
-            case .unavailable(.deviceNotEligible):
-                DeviceNotSupportedView()
             case .none:
                 CheckingAvailabilityView()
             @unknown default:
@@ -57,6 +55,8 @@ struct AvailabilityView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     AvailabilityView()
+        .environment(AIProviderStore())
 }

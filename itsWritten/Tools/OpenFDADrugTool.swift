@@ -8,6 +8,7 @@
 import Foundation
 import FoundationModels
 
+@available(iOS 26.0, *)
 struct OpenFDADrugTool: Tool {
     let name = "openfda_drug_lookup"
     let description = "Look up FDA-approved drug label information including indications, warnings, and interactions."

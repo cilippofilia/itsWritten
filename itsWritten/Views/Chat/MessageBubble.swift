@@ -13,6 +13,7 @@ import SwiftUI
 /// while AI responses appear with a gray background aligned to the leading edge.
 /// Bubbles take up to three quarters of the container in narrow windows and are
 /// capped in wide windows so lines stay readable.
+@available(iOS 26.0, *)
 struct MessageBubble: View {
     @State private var discloseToolsUsed: Bool = false
 
@@ -33,6 +34,12 @@ struct MessageBubble: View {
                 .background(message.isUser ? Color.blue.gradient : Color.gray.opacity(0.2).gradient)
                 .foregroundStyle(message.isUser ? Color.white : Color.primary)
                 .clipShape(.rect(cornerRadius: DesignConstants.CornerRadius.bubble))
+
+            if message.isUser == false, let providerName = message.providerName {
+                Text("Answered by \(providerName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if showsToolDisclosure {
                 Button(action: toggleToolsDisclosure) {
@@ -77,16 +84,20 @@ struct MessageBubble: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview("User message - Light") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: true))
 }
+@available(iOS 26.0, *)
 #Preview("AI response - Light") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: false))
 }
+@available(iOS 26.0, *)
 #Preview("User message - Dark") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: true))
         .preferredColorScheme(.dark)
 }
+@available(iOS 26.0, *)
 #Preview("AI response - Dark") {
     MessageBubble(
         message: ChatMessage(

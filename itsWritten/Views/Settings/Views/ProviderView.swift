@@ -8,6 +8,7 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ProviderView: View {
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
@@ -28,8 +29,8 @@ struct ProviderView: View {
                     .symbolRenderingMode(.multicolor)
             } footer: {
                 Text("""
-                Apple Intelligence runs entirely on your device, keeping your writing private \
-                and available even without an internet connection.
+                Apple Intelligence runs on your device by default. If it can't answer and you've \
+                added your own API key, itsWritten asks before sending anything to a cloud model.
                 """)
             }
 
@@ -51,6 +52,8 @@ struct ProviderView: View {
             } header: {
                 Text("Language Support")
             }
+
+            CloudKeysSection()
 
             Section("Supported Languages") {
                 ForEach(supportedLanguageNames, id: \.self) { name in
@@ -74,6 +77,7 @@ struct ProviderView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         ProviderView()

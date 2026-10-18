@@ -30,6 +30,7 @@ struct PostmarkWavesShape: Shape {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     PostmarkWavesShape()
         .stroke(.secondary)

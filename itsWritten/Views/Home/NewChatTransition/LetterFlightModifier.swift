@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Moves the folded letter along `path`, shrinking and tilting it as it drops into the
 /// menu button, then fading it out on arrival.
+@available(iOS 26.0, *)
 @Animatable
 struct LetterFlightModifier: ViewModifier {
     /// 0 at the conversation, 1 inside the menu button.

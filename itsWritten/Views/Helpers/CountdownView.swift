@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct CountdownView: View {
     @Environment(CountdownViewModel.self) private var viewModel
 
@@ -27,6 +28,7 @@ struct CountdownView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     CountdownView()
         .environment(CountdownViewModel())

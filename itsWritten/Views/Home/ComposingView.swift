@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ComposingView: View {
     @Environment(HomeViewModel.self) private var homeViewModel
     @Environment(CountdownViewModel.self) private var countDownViewModel
@@ -22,7 +23,7 @@ struct ComposingView: View {
                 text: $text,
                 isFocused: $isFocused,
                 placeholderText: homeViewModel.placeholderText,
-                isResponding: viewModel.session.isResponding
+                isResponding: viewModel.isResponding
             )
             #if !DEBUG
             .hideSensitiveData()
@@ -45,7 +46,7 @@ struct ComposingView: View {
 
                 HomeFooterView(
                     text: text,
-                    isResponding: viewModel.session.isResponding,
+                    isResponding: viewModel.isResponding,
                     sendAction: sendAction
                 )
                 .readableContentWidth()
@@ -54,6 +55,7 @@ struct ComposingView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     struct PreviewWrapper: View {
         @State private var text = ""

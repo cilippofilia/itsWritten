@@ -12,6 +12,7 @@ import SwiftUI
 ///
 /// Matches the screen it replaces so the swap is invisible: a short conversation sits at
 /// the top, and a long one shows its latest messages anchored to the bottom.
+@available(iOS 26.0, *)
 struct LetterContentView: View {
     let face: LetterFace
 

@@ -9,6 +9,7 @@ import SwiftUI
 
 /// The animated letter drawn over `HomeView` while a new chat starts: the conversation,
 /// folded in thirds, then flown into the menu button. Driven entirely by `transition`.
+@available(iOS 26.0, *)
 struct FoldingLetterView: View {
     let transition: NewChatTransition
 
