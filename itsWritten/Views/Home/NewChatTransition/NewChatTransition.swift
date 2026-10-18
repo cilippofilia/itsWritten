@@ -24,6 +24,7 @@ final class NewChatTransition {
         case paper
         case foldingBottom
         case foldingTop
+        case pressing
         case flying
     }
 
@@ -109,6 +110,15 @@ final class NewChatTransition {
     private(set) var bottomFoldAngle: Double = 0
     private(set) var topFoldAngle: Double = 0
 
+    /// Briefly 1 right after the last fold, as if the letter is being pressed flat.
+    private(set) var pressProgress: Double = 0
+
+    /// 0 = unstamped; 1 = the stamp has landed and been postmarked.
+    private(set) var stampProgress: Double = 0
+
+    /// Incremented when the stamp lands, to play a firmer haptic than the menu's tap.
+    private(set) var stampCount = 0
+
     /// 0 at the conversation, 1 inside the menu button.
     private(set) var flightProgress: Double = 0
 
@@ -156,7 +166,7 @@ final class NewChatTransition {
     func run() {
         guard phase == .paper, paperProgress == 0 else { return }
 
-        withAnimation(.easeOut(duration: 0.2)) {
+        withAnimation(.easeOut(duration: 0.25)) {
             paperProgress = 1
         } completion: {
             self.pendingReset?()
@@ -167,7 +177,8 @@ final class NewChatTransition {
 
     private func foldBottom() {
         phase = .foldingBottom
-        withAnimation(.easeInOut(duration: 0.28)) {
+        // A little bounce: the flap overshoots the fold slightly, then settles.
+        withAnimation(.spring(duration: 0.4, bounce: 0.25)) {
             bottomFoldAngle = 180
         } completion: {
             self.foldTop()
@@ -176,16 +187,33 @@ final class NewChatTransition {
 
     private func foldTop() {
         phase = .foldingTop
-        withAnimation(.easeInOut(duration: 0.28)) {
+        withAnimation(.spring(duration: 0.4, bounce: 0.25)) {
             topFoldAngle = 180
         } completion: {
-            self.fly()
+            self.pressFlat()
+        }
+    }
+
+    /// Presses the folded letter down for a beat while the stamp thumps on, then lets it
+    /// lift off.
+    private func pressFlat() {
+        phase = .pressing
+        stampCount += 1
+        withAnimation(.spring(duration: 0.25, bounce: 0.35)) {
+            pressProgress = 1
+            stampProgress = 1
+        } completion: {
+            withAnimation(.easeIn(duration: 0.15)) {
+                self.pressProgress = 0
+            } completion: {
+                self.fly()
+            }
         }
     }
 
     private func fly() {
         phase = .flying
-        withAnimation(.easeIn(duration: 0.4)) {
+        withAnimation(.easeIn(duration: 0.5)) {
             flightProgress = 1
         } completion: {
             self.deliveryCount += 1
@@ -202,6 +230,8 @@ final class NewChatTransition {
         paperProgress = 0
         bottomFoldAngle = 0
         topFoldAngle = 0
+        pressProgress = 0
+        stampProgress = 0
         flightProgress = 0
     }
 }

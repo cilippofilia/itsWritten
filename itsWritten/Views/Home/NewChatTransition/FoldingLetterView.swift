@@ -15,6 +15,7 @@ struct FoldingLetterView: View {
     var body: some View {
         let frame = transition.letterFrame
         let paper = transition.paperProgress
+        let press = transition.pressProgress
         let cornerRadius = 8 * paper
         let face = LetterFace(
             title: transition.snapshotTitle,
@@ -35,8 +36,19 @@ struct FoldingLetterView: View {
                 .modifier(FoldPanelModifier(angle: transition.bottomFoldAngle, crease: .top, direction: 1))
                 .zIndex(1)
         }
-        .scaleEffect(1 - 0.15 * paper)
-        .shadow(color: .black.opacity(0.25 * paper), radius: 16 * paper, y: 8 * paper)
+        // The stamp sits in the top-trailing corner of the folded letter (the middle third).
+        .overlay(alignment: .topTrailing) {
+            PostedStampView(progress: transition.stampProgress)
+                .padding(.top, frame.height / 3 + 14)
+                .padding(.trailing, 16)
+        }
+        // Pressing flat squashes the letter slightly and spreads its shadow.
+        .scaleEffect(1 - 0.15 * paper - 0.03 * press)
+        .shadow(
+            color: .black.opacity(0.25 * paper + 0.2 * press),
+            radius: 16 * paper + 10 * press,
+            y: 8 * paper + 6 * press
+        )
         .modifier(
             LetterFlightModifier(
                 progress: transition.flightProgress,
@@ -46,6 +58,7 @@ struct FoldingLetterView: View {
         )
         .position(x: frame.midX, y: frame.midY)
         .accessibilityHidden(true)
+        .sensoryFeedback(.impact(weight: .medium), trigger: transition.stampCount)
         // Animations start only once the letter is on screen; otherwise their
         // completions fire immediately and the whole sequence is skipped.
         .onAppear(perform: transition.run)
