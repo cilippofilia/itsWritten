@@ -38,7 +38,11 @@ struct FoldingLetterView: View {
         }
         // The stamp sits in the top-trailing corner of the folded letter (the middle third).
         .overlay(alignment: .topTrailing) {
-            PostedStampView(progress: transition.stampProgress)
+            PostedStampView(
+                progress: transition.stampProgress,
+                ink: transition.postmarkInk,
+                wearSeed: transition.postmarkWearSeed
+            )
                 .padding(.top, frame.height / 3 + 14)
                 .padding(.trailing, 16)
         }

@@ -119,6 +119,12 @@ final class NewChatTransition {
     /// Incremented when the stamp lands, to play a firmer haptic than the menu's tap.
     private(set) var stampCount = 0
 
+    /// This letter's postmark ink, chosen at random each time.
+    private(set) var postmarkInk: PostmarkInk = .red
+
+    /// This letter's pattern of worn postmark ink, chosen at random each time.
+    private(set) var postmarkWearSeed: UInt64 = 0
+
     /// 0 at the conversation, 1 inside the menu button.
     private(set) var flightProgress: Double = 0
 
@@ -158,6 +164,8 @@ final class NewChatTransition {
         // Only the bottom of the conversation is visible on the letter.
         snapshot = Array(messages.suffix(12))
         snapshotTitle = title
+        postmarkInk = PostmarkInk.allCases.randomElement() ?? .red
+        postmarkWearSeed = .random(in: .min ... .max)
         pendingReset = reset
         phase = .paper
     }

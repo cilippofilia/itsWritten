@@ -13,12 +13,15 @@ struct PostedStampView: View {
     /// 0 = not yet stamped; 1 = stamped and postmarked.
     let progress: Double
 
+    let ink: PostmarkInk
+    let wearSeed: UInt64
+
     var body: some View {
         StampView()
             .overlay(alignment: .leading) {
-                PostmarkView()
+                PostmarkView(ink: ink, wearSeed: wearSeed)
                     .offset(x: -30)
-                    .opacity(0.6 * progress)
+                    .opacity(0.85 * progress)
             }
             .rotationEffect(.degrees(3))
             .scaleEffect(1.6 - 0.6 * progress)
@@ -27,6 +30,6 @@ struct PostedStampView: View {
 }
 
 #Preview {
-    PostedStampView(progress: 1)
+    PostedStampView(progress: 1, ink: .red, wearSeed: 7)
         .padding(40)
 }

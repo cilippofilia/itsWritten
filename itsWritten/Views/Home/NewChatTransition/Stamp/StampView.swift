@@ -19,9 +19,16 @@ struct StampView: View {
             Image(.stampIcon)
                 .resizable()
                 .scaledToFit()
-                .padding(3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(white: 0.96))
+                // Matches the icon's own background, which fades from white at the top
+                // to a very light gray at the bottom, so the picture has no visible box.
+                .background(
+                    LinearGradient(
+                        colors: [.white, Color(white: 0.967)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .clipShape(.rect(cornerRadius: 1.5))
                 .overlay {
                     RoundedRectangle(cornerRadius: 1.5)
