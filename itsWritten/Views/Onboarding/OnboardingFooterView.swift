@@ -13,7 +13,6 @@ struct OnboardingFooterView: View {
     let isLastStep: Bool
     let backAction: () -> Void
     let primaryAction: () -> Void
-    let secondaryAction: () -> Void
 
     var body: some View {
         HStack {
@@ -21,13 +20,6 @@ struct OnboardingFooterView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(.glass)
                 .disabled(!canGoBack)
-
-            Spacer()
-
-            Button("Skip", action: secondaryAction)
-                .buttonStyle(.glass)
-                .foregroundStyle(.secondary)
-                .disabled(isLastStep)
 
             Spacer()
 
@@ -54,7 +46,6 @@ struct OnboardingFooterView: View {
         canGoBack: true,
         isLastStep: false,
         backAction: {},
-        primaryAction: {},
-        secondaryAction: {}
+        primaryAction: {}
     )
 }

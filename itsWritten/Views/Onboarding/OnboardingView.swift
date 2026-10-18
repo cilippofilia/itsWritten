@@ -41,65 +41,122 @@ struct OnboardingView: View {
         )
     ]
 
+    @State private var deck = OnboardingDeck(count: OnboardingView.steps.count)
+
+    /// True while a card is being postmarked and sent, so taps can't stack up.
+    @State private var isSending = false
+
+    /// How far the current card has been dragged horizontally.
+    @State private var dragOffset = 0.0
+
+    /// How far a swipe must travel, or be flung, to change cards.
+    private let swipeThreshold = 80.0
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack {
-                    ForEach(Self.steps.prefix(visibleCount)) { step in
-                        OnboardingStepView(step: step)
-                            .id(step.id)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-                .readableContentWidth()
-
-                Spacer(minLength: 100)
+                OnboardingDeckView(steps: Self.steps, deck: deck, dragOffset: dragOffset)
+                    .contentShape(.rect)
+                    .gesture(swipeGesture)
+                    .frame(maxWidth: DesignConstants.Width.postcard)
+                    .padding()
+                    // Room for the waiting cards peeking out below.
+                    .padding(.bottom, DesignConstants.Spacing.large)
+                    .frame(maxWidth: .infinity)
+            }
+            .defaultScrollAnchor(.center, for: .alignment)
+            .scrollBounceBehavior(.basedOnSize)
+            .safeAreaInset(edge: .top) {
+                OnboardingProgressView(current: deck.currentIndex + 1, total: deck.count)
+                    .padding(.horizontal)
+                    .readableContentWidth()
             }
             .navigationTitle("itsWritten")
+            .sensoryFeedback(.impact(weight: .medium), trigger: deck.postmarkedCount) { old, new in
+                new > old
+            }
         }
         .safeAreaInset(edge: .bottom) {
             OnboardingFooterView(
-                canGoBack: visibleCount > 1,
-                isLastStep: visibleCount == Self.steps.count,
+                canGoBack: deck.canGoBack,
+                isLastStep: deck.isLastCard,
                 backAction: goBack,
-                primaryAction: primaryAction,
-                secondaryAction: skipToLast
+                primaryAction: primaryAction
             )
+            .disabled(isSending)
             .readableContentWidth()
         }
     }
 
+    /// Drags the current card sideways; letting go far or fast enough sends it on or
+    /// brings the previous card back, otherwise it springs back into place.
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onChanged { value in
+                guard !isSending else { return }
+                dragOffset = deck.dragOffset(for: value.translation.width)
+            }
+            .onEnded { value in
+                guard !isSending else { return }
+
+                let swipe = deck.swipe(
+                    translation: value.translation.width,
+                    predictedTranslation: value.predictedEndTranslation.width,
+                    threshold: swipeThreshold
+                )
+
+                switch swipe {
+                case .next:
+                    primaryAction()
+                case .back:
+                    goBack()
+                case nil:
+                    withAnimation(.spring(duration: 0.35, bounce: 0.3)) {
+                        dragOffset = 0
+                    }
+                }
+            }
+    }
+
     private func goBack() {
-        guard visibleCount > 1 else { return }
-        withAnimation(.easeInOut) {
-            visibleCount -= 1
+        withAnimation(.smooth) {
+            dragOffset = 0
+            deck.goBack()
         }
     }
 
+    /// Postmarks the current card, then sends it off, or finishes after the last one. A
+    /// swiped card stays where it was let go while the postmark lands.
     private func primaryAction() {
-        if visibleCount < Self.steps.count {
-            advance()
-        } else {
-            finish()
-        }
-    }
+        guard !isSending else { return }
+        isSending = true
 
-    private func advance() {
-        if visibleCount < Self.steps.count {
-            withAnimation(.easeInOut) {
-                visibleCount += 1
+        withAnimation(.spring(duration: 0.3, bounce: 0.35)) {
+            deck.postmarkCurrent()
+        } completion: {
+            if deck.isLastCard {
+                finish()
+            } else {
+                sendCurrent()
             }
         }
     }
 
-    private func skipToLast() {
-        withAnimation(.easeInOut) {
-            visibleCount = Self.steps.count
+    private func sendCurrent() {
+        withAnimation(.smooth(duration: 0.5)) {
+            dragOffset = 0
+            deck.sendCurrent()
+        } completion: {
+            isSending = false
         }
     }
 
+    /// Lets the final postmark settle for a beat before leaving onboarding.
     private func finish() {
-        onFinish()
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            onFinish()
+        }
     }
 }
 
