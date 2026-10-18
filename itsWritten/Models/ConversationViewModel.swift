@@ -196,8 +196,11 @@ extension ConversationViewModel {
             characterBudget: max(0, Self.contextCharacterBudget - (instructions?.count ?? 0))
         )
 
+        // Set before any suspension so a second send can't start a parallel response.
+        isResponding = true
         let sendGeneration = generation
         responseTask = Task {
+            defer { if sendGeneration == generation { isResponding = false } }
             var request = request
             await compactIfNeeded(&request)
             guard sendGeneration == generation else { return }
@@ -278,8 +281,13 @@ extension ConversationViewModel {
         } catch {
             guard generation == self.generation else { return }
             var final = stayedOnDeviceResponse
-            if Self.failureKind(of: error) != .staysOnDevice {
-                let recovered = await recoverAfterFailure(for: prompt, request: request)
+            let kind = Self.failureKind(of: error)
+            if kind != .staysOnDevice {
+                let recovered = await recoverAfterFailure(
+                    for: prompt,
+                    request: request,
+                    onDeviceOnly: kind == .guardrailViolation
+                )
                 guard generation == self.generation else { return }
                 final = recovered ?? recoveryFailureResponse
             }
@@ -425,7 +433,10 @@ extension ConversationViewModel {
             }
         } catch {
             switch Self.failureKind(of: error) {
-            case .recoverable: return await recoverAfterFailure(for: prompt, request: request)
+            case .guardrailViolation:
+                return await recoverAfterFailure(for: prompt, request: request, onDeviceOnly: true)
+            case .contextWindowExceeded:
+                return await recoverAfterFailure(for: prompt, request: request)
             case .staysOnDevice: return stayedOnDeviceResponse
             case .other: return nil
             }
@@ -433,8 +444,15 @@ extension ConversationViewModel {
     }
 
     /// Retries once with a compacted history that also drops the last assistant turn.
-    private func recoverAfterFailure(for prompt: String, request: ModelRequest) async -> AssistantResponse? {
-        guard let orchestrator = aiProvider?.orchestrator else { return nil }
+    /// `onDeviceOnly` retries on the on-device orchestrator, so content the on-device
+    /// guardrails blocked is never forwarded to a cloud model.
+    private func recoverAfterFailure(
+        for prompt: String,
+        request: ModelRequest,
+        onDeviceOnly: Bool = false
+    ) async -> AssistantResponse? {
+        guard let aiProvider else { return nil }
+        let orchestrator = onDeviceOnly ? aiProvider.onDeviceOrchestrator : aiProvider.orchestrator
         do {
             let preparedRequest = await prepareModelRequest(for: prompt)
             switch preparedRequest {
@@ -459,8 +477,10 @@ extension ConversationViewModel {
     /// Sorts a model error into how the conversation should react to it.
     private static func failureKind(of error: any Error) -> FailureKind {
         switch error as? ProviderError {
-        case .guardrailViolation, .contextWindowExceeded:
-            .recoverable
+        case .guardrailViolation:
+            .guardrailViolation
+        case .contextWindowExceeded:
+            .contextWindowExceeded
         case .privacyRestricted, .noProviderAvailable, .capabilityUnavailable:
             .staysOnDevice
         default:
@@ -690,8 +710,10 @@ private struct StreamedReply {
 
 /// How a send reacts to a model error.
 private enum FailureKind {
-    /// Retry once with a compacted history.
-    case recoverable
+    /// Retry once with a compacted history, on device only.
+    case guardrailViolation
+    /// Retry once with a compacted history through the full chain.
+    case contextWindowExceeded
     /// Nothing could answer without leaving the device; tell the user, don't retry.
     case staysOnDevice
     /// Show the generic failure copy.

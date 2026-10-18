@@ -68,4 +68,26 @@ final class AIProviderStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.setKey("x", for: .openAI))
         XCTAssertThrowsError(try store.removeKey(for: .openAI))
     }
+
+    func testOnDeviceConfigurationNeverLeavesTheDevice() {
+        let base = AIProviderStore.configuration(keys: [.anthropic: "a", .openAI: "o"], consent: makeConsent())
+        let config = AIProviderStore.onDeviceConfiguration(from: base)
+        XCTAssertEqual(config.preference, .onDeviceOnly)
+        XCTAssertTrue(config.userAccounts.isEmpty)
+        XCTAssertFalse(config.enablePrivateCloudCompute)
+        XCTAssertTrue(config.enableOnDevice)
+    }
+
+    func testSetKeyRebuildsOnDeviceOrchestrator() throws {
+        let store = AIProviderStore(keyStore: InMemoryAPIKeyStore(), consent: makeConsent())
+        let before = store.onDeviceOrchestrator
+        try store.setKey("sk-1", for: .openAI)
+        XCTAssertFalse(store.onDeviceOrchestrator === before)
+    }
+
+    func testTestInitDefaultsOnDeviceOrchestratorToMain() {
+        let orchestrator = AIOrchestrator(providers: [])
+        let store = AIProviderStore(orchestrator: orchestrator, consent: makeConsent())
+        XCTAssertTrue(store.onDeviceOrchestrator === orchestrator)
+    }
 }

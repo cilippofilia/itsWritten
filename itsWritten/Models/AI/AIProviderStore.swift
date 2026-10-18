@@ -19,6 +19,10 @@ final class AIProviderStore {
     /// The orchestrator every model call should go through.
     private(set) var orchestrator: AIOrchestrator
 
+    /// An orchestrator that never leaves the device. Used to retry after an
+    /// on-device guardrail violation, so blocked content is never sent to the cloud.
+    private(set) var onDeviceOrchestrator: AIOrchestrator
+
     /// Vendors that currently have a stored key.
     private(set) var configuredVendors: Set<CloudVendor>
 
@@ -36,16 +40,22 @@ final class AIProviderStore {
         self.consent = consent
         let keys = Self.storedKeys(in: keyStore)
         self.configuredVendors = Set(keys.keys)
-        self.orchestrator = AIOrchestrator(
-            configuration: Self.configuration(keys: keys, consent: consent)
-        )
+        let configuration = Self.configuration(keys: keys, consent: consent)
+        self.orchestrator = AIOrchestrator(configuration: configuration)
+        self.onDeviceOrchestrator = AIOrchestrator(configuration: Self.onDeviceConfiguration(from: configuration))
     }
 
     /// Test-only initializer: no key store, so `setKey` and `removeKey` throw.
-    init(orchestrator: AIOrchestrator, consent: CloudConsentCoordinator) {
+    /// `onDeviceOrchestrator` defaults to `orchestrator`.
+    init(
+        orchestrator: AIOrchestrator,
+        consent: CloudConsentCoordinator,
+        onDeviceOrchestrator: AIOrchestrator? = nil
+    ) {
         self.keyStore = nil
         self.consent = consent
         self.orchestrator = orchestrator
+        self.onDeviceOrchestrator = onDeviceOrchestrator ?? orchestrator
         self.configuredVendors = []
     }
 
@@ -83,14 +93,24 @@ final class AIProviderStore {
         return configuration
     }
 
+    /// Derives a configuration that only ever uses the on-device model: no cloud
+    /// accounts, no Private Cloud Compute, `.onDeviceOnly` preference.
+    static func onDeviceConfiguration(from configuration: AIConfiguration) -> AIConfiguration {
+        var onDevice = configuration
+        onDevice.preference = .onDeviceOnly
+        onDevice.userAccounts = []
+        onDevice.enablePrivateCloudCompute = false
+        return onDevice
+    }
+
     private func update(_ key: String?, for vendor: CloudVendor) throws {
         guard let keyStore else { throw AIProviderStoreError.keyStoreUnavailable }
         try keyStore.setKey(key, for: vendor)
         let keys = Self.storedKeys(in: keyStore)
         configuredVendors = Set(keys.keys)
-        orchestrator = AIOrchestrator(
-            configuration: Self.configuration(keys: keys, consent: consent)
-        )
+        let configuration = Self.configuration(keys: keys, consent: consent)
+        orchestrator = AIOrchestrator(configuration: configuration)
+        onDeviceOrchestrator = AIOrchestrator(configuration: Self.onDeviceConfiguration(from: configuration))
     }
 
     private static func storedKeys(in keyStore: any APIKeyStoring) -> [CloudVendor: String] {

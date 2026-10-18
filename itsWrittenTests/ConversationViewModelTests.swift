@@ -166,14 +166,24 @@ final class ConversationViewModelTests: XCTestCase {
     /// is non-nil, a background task answers every consent prompt with it.
     private func makeViewModel(
         providers: [any ModelProvider],
-        consentAnswer: Bool?
+        onDeviceProviders: [any ModelProvider]? = nil,
+        consentAnswer: Bool?,
+        alwaysAllowed: ConsentDestination? = nil
     ) throws -> (ConversationViewModel, CloudConsentCoordinator) {
         let consent = CloudConsentCoordinator(defaults: UserDefaults(suiteName: UUID().uuidString)!)
         let orchestrator = AIOrchestrator(
             providers: providers,
             privacyDisclosure: .askOnPrivacyChange { await consent.request($0) }
         )
-        let store = AIProviderStore(orchestrator: orchestrator, consent: consent)
+        if let alwaysAllowed {
+            consent.setAlwaysAllowed(true, for: alwaysAllowed)
+        }
+        let onDeviceOrchestrator = onDeviceProviders.map { AIOrchestrator(providers: $0) }
+        let store = AIProviderStore(
+            orchestrator: orchestrator,
+            consent: consent,
+            onDeviceOrchestrator: onDeviceOrchestrator
+        )
 
         let schema = Schema([ChatThread.self, ChatMessage.self])
         let configuration = SwiftData.ModelConfiguration(isStoredInMemoryOnly: true)
@@ -363,6 +373,43 @@ final class ConversationViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.title, "New Conversation")
     }
 
+    func testGuardrailRetryNeverReachesCloud() async throws {
+        let cloudCalls = Recorder<String>()
+        let (viewModel, _) = try makeViewModel(
+            // The second on-device call fails recoverably, so a retry through the main
+            // chain would fall back to the always-allowed cloud provider.
+            providers: [
+                SequencedProvider(outcomes: [.failure(.guardrailViolation("x")), .failure(.rateLimited(retryAfter: nil))]),
+                cloudProvider(outcome: .success("cloud"), onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
+            ],
+            onDeviceProviders: [MockCapableProvider(outcome: .failure(.rateLimited(retryAfter: nil)))],
+            consentAnswer: nil,
+            alwaysAllowed: .vendor(.anthropic)
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
+        await viewModel.responseTask?.value
+
+        XCTAssertTrue(cloudCalls.values.isEmpty, "guardrail-blocked content must never reach the cloud")
+        XCTAssertEqual(
+            viewModel.messages.last?.content,
+            "I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat."
+        )
+    }
+
+    func testSendMarksRespondingSynchronously() async throws {
+        let (viewModel, _) = try makeViewModel(
+            providers: [MockCapableProvider(outcome: .success("ok"))],
+            consentAnswer: nil
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
+        XCTAssertTrue(viewModel.isResponding)
+        await viewModel.responseTask?.value
+
+        XCTAssertFalse(viewModel.isResponding)
+    }
+
     func testResetDuringPendingConsentAppendsNothing() async throws {
         let (viewModel, consent) = try makeViewModel(
             providers: [
@@ -398,5 +445,25 @@ private final class Recorder<Value: Sendable>: Sendable {
 
     func append(_ value: Value) {
         storage.withLock { $0.append(value) }
+    }
+}
+
+/// On-device plain provider that returns `outcomes` in order, repeating the last one.
+private struct SequencedProvider: ModelProvider {
+    let identifier = ProviderIdentifier.onDevice
+    let privacyLevel = PrivacyLevel.onDevice
+    let outcomes: [Result<String, ProviderError>]
+    private let callCount = Recorder<Int>()
+
+    init(outcomes: [Result<String, ProviderError>]) {
+        self.outcomes = outcomes
+    }
+
+    func availability() async -> ProviderAvailability { .available }
+
+    func respond(to prompt: String, instructions: String?, history: [ChatTurn]) async throws -> String {
+        let index = callCount.values.count
+        callCount.append(index)
+        return try outcomes[min(index, outcomes.count - 1)].get()
     }
 }

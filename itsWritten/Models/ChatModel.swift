@@ -37,7 +37,7 @@ final class ChatMessage: Identifiable {
     var toolSources: [ChatMessageSource] = []
     /// Display name of the cloud model that wrote this reply, or `nil` when it was
     /// written on device (or by the user).
-    var providerName: String? = nil
+    var providerName: String?
 
     init(
         id: UUID = UUID(),
