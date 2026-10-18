@@ -214,7 +214,7 @@ extension ConversationViewModel {
         responseTask = Task {
             defer { if sendGeneration == generation { isResponding = false } }
             var request = request
-            await compactIfNeeded(&request)
+            await compactIfNeeded(&request, prompt: resolvedPrompt)
             guard sendGeneration == generation else { return }
             switch responseType {
             case .standard: await generateStandardResponse(for: resolvedPrompt, request: request, generation: sendGeneration)
@@ -224,14 +224,16 @@ extension ConversationViewModel {
         }
     }
 
-    /// On iOS 26.4+, halves the history budget when the history already fills most of
-    /// the first model's context window.
-    private func compactIfNeeded(_ request: inout ModelRequest) async {
+    /// On iOS 26.4+, halves the history budget when the history plus the prompt
+    /// already fill most of the first model's context window.
+    private func compactIfNeeded(_ request: inout ModelRequest, prompt: String) async {
         guard #available(iOS 26.4, macOS 26.4, *) else { return }
         guard let orchestrator = aiProvider?.orchestrator else { return }
+        // `contextUsage` has no prompt parameter; a trailing user turn is counted as
+        // the same transcript prompt entry the real call sends.
         let usage = await orchestrator.contextUsage(
             instructions: request.instructions,
-            history: request.history(isExcluded: isExcludedFromHistory)
+            history: request.history(isExcluded: isExcludedFromHistory) + [.user(prompt)]
         )
         guard (usage?.fraction ?? 0) >= Self.contextCompactionThreshold else { return }
         request.characterBudget /= 2
@@ -294,20 +296,9 @@ extension ConversationViewModel {
             }
         } catch {
             guard generation == self.generation else { return }
-            var final = stayedOnDeviceResponse
-            let kind = Self.failureKind(of: error)
-            if kind == .guardrailViolation {
-                markBlocked(request)
-            }
-            if kind != .staysOnDevice {
-                let recovered = await recoverAfterFailure(
-                    for: prompt,
-                    request: request,
-                    onDeviceOnly: kind == .guardrailViolation
-                )
-                guard generation == self.generation else { return }
-                final = recovered ?? recoveryFailureResponse
-            }
+            let recovered = await response(afterFailure: error, for: prompt, request: request, retriesOther: true)
+            guard generation == self.generation else { return }
+            let final = recovered ?? recoveryFailureResponse
             finish(final, for: request)
             replaceStreamedMessage(
                 at: &messageIndex,
@@ -451,25 +442,67 @@ extension ConversationViewModel {
                 return assistantResponse
             }
         } catch {
-            switch Self.failureKind(of: error) {
-            case .guardrailViolation:
-                markBlocked(request)
-                return await recoverAfterFailure(for: prompt, request: request, onDeviceOnly: true)
-            case .contextWindowExceeded:
-                return await recoverAfterFailure(for: prompt, request: request)
-            case .staysOnDevice: return stayedOnDeviceResponse
-            case .other: return nil
-            }
+            return await response(afterFailure: error, for: prompt, request: request, retriesOther: false)
         }
     }
 
-    /// Retries once with a compacted history that also drops the last assistant turn.
-    /// `onDeviceOnly` retries on the on-device orchestrator, so content the on-device
-    /// guardrails blocked is never forwarded to a cloud model.
+    /// Reacts to the error that ended the first attempt at a turn. Returns the reply
+    /// to show, or `nil` for the generic recovery-failure copy.
+    ///
+    /// - Guardrail violations retry once on device only, so blocked content never
+    ///   reaches the cloud.
+    /// - Context overflow retries once through the full chain.
+    /// - When nothing could answer on device and no cloud model was allowed, retries
+    ///   once on device with half the history before saying so.
+    /// - A rejected cloud key or request never retries.
+    /// - Anything else retries only when `retriesOther` is set (streaming).
+    private func response(
+        afterFailure error: any Error,
+        for prompt: String,
+        request: ModelRequest,
+        retriesOther: Bool
+    ) async -> AssistantResponse? {
+        let kind = Self.failureKind(of: error)
+        switch kind {
+        case .guardrailViolation:
+            markBlocked(request)
+            return await recoverAfterFailure(for: prompt, request: request, onDeviceOnly: true)
+        case .contextWindowExceeded:
+            return await recoverAfterFailure(for: prompt, request: request)
+        case .staysOnDevice:
+            return await retryOnDeviceCompacted(for: prompt, request: request)
+        case .keyRejected, .requestRejected:
+            return cloudRejectionResponse(for: kind)
+        case .other:
+            guard retriesOther else { return nil }
+            return await recoverAfterFailure(for: prompt, request: request)
+        }
+    }
+
+    /// The last resort before telling the user a request stayed on device: one retry on
+    /// the on-device model with the history rebuilt at half the character budget. This
+    /// keeps on-device compaction ahead of the cloud even when the user declined the
+    /// cloud prompt. Returns the stayed-on-device copy if the retry fails too.
+    private func retryOnDeviceCompacted(for prompt: String, request: ModelRequest) async -> AssistantResponse {
+        var compacted = request
+        compacted.characterBudget /= 2
+        let recovered = await recoverAfterFailure(
+            for: prompt,
+            request: compacted,
+            onDeviceOnly: true,
+            excludingLastAssistant: false
+        )
+        return recovered ?? stayedOnDeviceResponse
+    }
+
+    /// Retries once with a compacted history that, by default, also drops the last
+    /// assistant turn. `onDeviceOnly` retries on the on-device orchestrator, so content
+    /// the on-device guardrails blocked is never forwarded to a cloud model.
     private func recoverAfterFailure(
         for prompt: String,
         request: ModelRequest,
-        onDeviceOnly: Bool = false
+        onDeviceOnly: Bool = false,
+        excludingLastAssistant: Bool = true
     ) async -> AssistantResponse? {
         guard let aiProvider else { return nil }
         let orchestrator = onDeviceOnly ? aiProvider.onDeviceOrchestrator : aiProvider.orchestrator
@@ -482,7 +515,10 @@ extension ConversationViewModel {
                 let response = try await orchestrator.respondDetailed(
                     to: preparedPrompt,
                     instructions: request.instructions,
-                    history: request.history(excludingLastAssistant: true, isExcluded: isExcludedFromHistory),
+                    history: request.history(
+                        excludingLastAssistant: excludingLastAssistant,
+                        isExcluded: isExcludedFromHistory
+                    ),
                     tools: AppLanguageModel.tools,
                     options: request.options
                 )
@@ -491,10 +527,22 @@ extension ConversationViewModel {
             }
         } catch {
             let kind = Self.failureKind(of: error)
-            if kind == .guardrailViolation {
+            switch kind {
+            case .guardrailViolation:
                 markBlocked(request)
+                return nil
+            case .staysOnDevice:
+                // The on-device retry is terminal; a full-chain retry gets one compacted
+                // on-device attempt, like the first try.
+                if onDeviceOnly {
+                    return stayedOnDeviceResponse
+                }
+                return await retryOnDeviceCompacted(for: prompt, request: request)
+            case .keyRejected, .requestRejected:
+                return cloudRejectionResponse(for: kind)
+            case .contextWindowExceeded, .other:
+                return nil
             }
-            return kind == .staysOnDevice ? stayedOnDeviceResponse : nil
         }
     }
 
@@ -507,6 +555,10 @@ extension ConversationViewModel {
             .contextWindowExceeded
         case .privacyRestricted, .noProviderAvailable, .capabilityUnavailable:
             .staysOnDevice
+        case .unauthorized:
+            .keyRejected
+        case .api:
+            .requestRejected
         default:
             .other
         }
@@ -544,7 +596,39 @@ extension ConversationViewModel {
     }
 
     private static var appGeneratedCopy: Set<String> {
-        [stayedOnDeviceMessage, recoveryFailureMessage, genericErrorMessage]
+        let vendorNames = CloudVendor.allCases.map { Optional(ConsentDestination.vendor($0).displayName) } + [nil]
+        let cloudCopy = vendorNames.flatMap { name in
+            [keyRejectedMessage(vendorName: name), requestRejectedMessage(vendorName: name)]
+        }
+        return Set([stayedOnDeviceMessage, recoveryFailureMessage, genericErrorMessage] + cloudCopy)
+    }
+
+    /// Shown when a cloud provider rejects the API key. Names the vendor when known.
+    static func keyRejectedMessage(vendorName: String?) -> String {
+        let name = vendorName ?? String(localized: "The cloud model")
+        return String(localized: "\(name) didn't accept your API key. Check it in Settings › Provider.")
+    }
+
+    /// Shown when a cloud provider's API refuses the request. Names the vendor when known.
+    static func requestRejectedMessage(vendorName: String?) -> String {
+        let name = vendorName ?? String(localized: "The cloud model")
+        return String(localized: "\(name) couldn't take this request. Check your API key in Settings › Provider.")
+    }
+
+    /// The cloud vendor that most likely failed: the only one with a key, if exactly
+    /// one is configured. Volta's errors don't say which provider threw them.
+    private var likelyCloudVendorName: String? {
+        guard let vendors = aiProvider?.configuredVendors, vendors.count == 1, let vendor = vendors.first else {
+            return nil
+        }
+        return ConsentDestination.vendor(vendor).displayName
+    }
+
+    private func cloudRejectionResponse(for kind: FailureKind) -> AssistantResponse {
+        let message = kind == .keyRejected
+            ? Self.keyRejectedMessage(vendorName: likelyCloudVendorName)
+            : Self.requestRejectedMessage(vendorName: likelyCloudVendorName)
+        return Self.appCopyResponse(message)
     }
 
     /// Assistant replies to leave out of the history: model refusals and app copy.
@@ -771,8 +855,14 @@ private enum FailureKind {
     case guardrailViolation
     /// Retry once with a compacted history through the full chain.
     case contextWindowExceeded
-    /// Nothing could answer without leaving the device; tell the user, don't retry.
+    /// Nothing could answer without leaving the device. Retry once on device with a
+    /// compacted history, then tell the user.
     case staysOnDevice
+    /// The cloud provider didn't accept the API key (`.unauthorized`). Never retried.
+    case keyRejected
+    /// The cloud provider's API refused the request (`.api`), for example an invalid
+    /// key some vendors report this way. Never retried.
+    case requestRejected
     /// Show the generic failure copy.
     case other
 }

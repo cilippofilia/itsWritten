@@ -22,6 +22,8 @@ class ConversationViewModelTestCase: XCTestCase {
 
     var container: ModelContainer?
     var consentAnswerer: Task<Void, Never>?
+    /// How many consent prompts the background answerer has answered.
+    var answeredConsentPrompts = 0
 
     override func tearDown() async throws {
         consentAnswerer?.cancel()
@@ -36,7 +38,8 @@ class ConversationViewModelTestCase: XCTestCase {
         providers: [any ModelProvider],
         onDeviceProviders: [any ModelProvider]? = nil,
         consentAnswer: Bool?,
-        alwaysAllowed: ConsentDestination? = nil
+        alwaysAllowed: ConsentDestination? = nil,
+        configuredVendors: Set<CloudVendor> = []
     ) throws -> (ConversationViewModel, CloudConsentCoordinator) {
         let consent = CloudConsentCoordinator(defaults: UserDefaults(suiteName: UUID().uuidString)!)
         let orchestrator = AIOrchestrator(
@@ -50,7 +53,8 @@ class ConversationViewModelTestCase: XCTestCase {
         let store = AIProviderStore(
             orchestrator: orchestrator,
             consent: consent,
-            onDeviceOrchestrator: onDeviceOrchestrator
+            onDeviceOrchestrator: onDeviceOrchestrator,
+            configuredVendors: configuredVendors
         )
 
         let schema = Schema([ChatThread.self, ChatMessage.self])
@@ -71,6 +75,7 @@ class ConversationViewModelTestCase: XCTestCase {
                 for _ in 0..<500 {
                     if let request = consent.pendingRequest {
                         consent.respond(to: request.id, allow: consentAnswer)
+                        self.answeredConsentPrompts += 1
                     }
                     do {
                         try await Task.sleep(for: .milliseconds(10))

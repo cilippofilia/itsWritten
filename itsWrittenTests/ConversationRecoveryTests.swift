@@ -34,7 +34,10 @@ final class ConversationRecoveryTests: ConversationViewModelTestCase {
             // The second on-device call fails recoverably, so a retry through the main
             // chain would fall back to the always-allowed cloud provider.
             providers: [
-                SequencedProvider(outcomes: [.failure(.guardrailViolation("x")), .failure(.rateLimited(retryAfter: nil))]),
+                SequencedProvider(outcomes: [
+                    .failure(.guardrailViolation("x")),
+                    .failure(.rateLimited(retryAfter: nil))
+                ]),
                 cloudProvider(outcome: .success("cloud"), onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
             ],
             onDeviceProviders: [MockCapableProvider(outcome: .failure(.rateLimited(retryAfter: nil)))],
@@ -95,4 +98,152 @@ final class ConversationRecoveryTests: ConversationViewModelTestCase {
         XCTAssertEqual(viewModel.messages.first?.wasBlocked, false)
     }
 
+    // MARK: - On-device compaction after a declined cloud prompt
+
+    /// The main chain overflows on device, the user declines the cloud, and the
+    /// on-device-only retry with half the history answers.
+    private func makeDeclinedOverflowViewModel(
+        cloudCalls: Recorder<String>,
+        onDeviceCalls: Recorder<MockCapableProvider.Call>
+    ) throws -> ConversationViewModel {
+        let (viewModel, _) = try makeViewModel(
+            providers: [
+                MockCapableProvider(outcome: .failure(.contextWindowExceeded)),
+                cloudProvider(onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
+            ],
+            onDeviceProviders: [
+                MockCapableProvider(outcome: .success("compacted"), onCall: { onDeviceCalls.append($0) })
+            ],
+            consentAnswer: false
+        )
+        return viewModel
+    }
+
+    func testDeclinedCloudStillCompactsOnDevice() async throws {
+        let cloudCalls = Recorder<String>()
+        let onDeviceCalls = Recorder<MockCapableProvider.Call>()
+        let viewModel = try makeDeclinedOverflowViewModel(cloudCalls: cloudCalls, onDeviceCalls: onDeviceCalls)
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(viewModel.messages.last?.content, "compacted")
+        XCTAssertTrue(cloudCalls.values.isEmpty, "the cloud provider must never be called after a decline")
+        XCTAssertEqual(onDeviceCalls.values.count, 1)
+        XCTAssertEqual(answeredConsentPrompts, 1)
+    }
+
+    func testDeclinedCloudStillCompactsOnDeviceWhenStreaming() async throws {
+        let cloudCalls = Recorder<String>()
+        let onDeviceCalls = Recorder<MockCapableProvider.Call>()
+        let viewModel = try makeDeclinedOverflowViewModel(cloudCalls: cloudCalls, onDeviceCalls: onDeviceCalls)
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .streaming)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(viewModel.messages.last?.content, "compacted")
+        XCTAssertEqual(assistantMessages(viewModel).count, 1)
+        XCTAssertTrue(cloudCalls.values.isEmpty, "the cloud provider must never be called after a decline")
+        XCTAssertEqual(onDeviceCalls.values.count, 1)
+    }
+
+    func testDeclinedCloudShowsStayedOnDeviceWhenCompactionFails() async throws {
+        let (viewModel, _) = try makeViewModel(
+            providers: [
+                MockCapableProvider(outcome: .failure(.contextWindowExceeded)),
+                cloudProvider()
+            ],
+            onDeviceProviders: [MockCapableProvider(outcome: .failure(.contextWindowExceeded))],
+            consentAnswer: false
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(viewModel.messages.last?.content, ConversationViewModel.stayedOnDeviceMessage)
+    }
+
+    // MARK: - Rejected cloud keys
+
+    func testRejectedKeyShowsKeyCopyWithoutRetry() async throws {
+        let cloudCalls = Recorder<String>()
+        let onDeviceCalls = Recorder<MockCapableProvider.Call>()
+        let (viewModel, _) = try makeViewModel(
+            providers: [
+                MockCapableProvider(availability: .unavailable(reason: "test")),
+                cloudProvider(
+                    outcome: .failure(.unauthorized),
+                    onRespond: { prompt, _, _ in cloudCalls.append(prompt) }
+                )
+            ],
+            onDeviceProviders: [
+                MockCapableProvider(outcome: .success("retried"), onCall: { onDeviceCalls.append($0) })
+            ],
+            consentAnswer: true
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(viewModel.messages.last?.content, ConversationViewModel.keyRejectedMessage(vendorName: nil))
+        XCTAssertEqual(
+            viewModel.messages.last?.content,
+            "The cloud model didn't accept your API key. Check it in Settings › Provider."
+        )
+        XCTAssertEqual(cloudCalls.values.count, 1, "a rejected key must not be retried")
+        XCTAssertTrue(onDeviceCalls.values.isEmpty)
+    }
+
+    func testRejectedKeyNamesTheOnlyVendorWhenStreaming() async throws {
+        let cloudCalls = Recorder<String>()
+        let (viewModel, _) = try makeViewModel(
+            providers: [
+                MockCapableProvider(availability: .unavailable(reason: "test")),
+                cloudProvider(
+                    outcome: .failure(.unauthorized),
+                    onRespond: { prompt, _, _ in cloudCalls.append(prompt) }
+                )
+            ],
+            consentAnswer: true,
+            configuredVendors: [.anthropic]
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .streaming)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(
+            viewModel.messages.last?.content,
+            "Claude didn't accept your API key. Check it in Settings › Provider."
+        )
+        XCTAssertEqual(assistantMessages(viewModel).count, 1)
+        XCTAssertEqual(cloudCalls.values.count, 1, "a rejected key must not be retried, streaming included")
+    }
+
+    func testRejectedRequestShowsCopyWithoutRetry() async throws {
+        let cloudCalls = Recorder<String>()
+        let (viewModel, _) = try makeViewModel(
+            providers: [
+                MockCapableProvider(availability: .unavailable(reason: "test")),
+                cloudProvider(
+                    outcome: .failure(.api(message: "API key not valid", code: "INVALID_ARGUMENT")),
+                    onRespond: { prompt, _, _ in cloudCalls.append(prompt) }
+                )
+            ],
+            consentAnswer: true
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .streaming)
+        await viewModel.responseTask?.value
+
+        XCTAssertEqual(viewModel.messages.last?.content, ConversationViewModel.requestRejectedMessage(vendorName: nil))
+        XCTAssertEqual(cloudCalls.values.count, 1)
+    }
+
+    func testCloudRejectionCopyIsLeftOutOfHistory() {
+        typealias ViewModel = ConversationViewModel
+        XCTAssertTrue(ViewModel.isAppGeneratedCopy(ViewModel.keyRejectedMessage(vendorName: "Gemini")))
+        XCTAssertTrue(ViewModel.isAppGeneratedCopy(ViewModel.requestRejectedMessage(vendorName: nil)))
+        XCTAssertTrue(ConversationViewModel.isAppGeneratedCopy(ConversationViewModel.recoveryFailureMessage))
+        XCTAssertFalse(ConversationViewModel.isAppGeneratedCopy("Here's what I found."))
+    }
 }

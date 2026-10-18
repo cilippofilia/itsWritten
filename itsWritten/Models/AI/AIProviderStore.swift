@@ -46,17 +46,19 @@ final class AIProviderStore {
     }
 
     /// Test-only initializer: no key store, so `setKey` and `removeKey` throw.
-    /// `onDeviceOrchestrator` defaults to `orchestrator`.
+    /// `onDeviceOrchestrator` defaults to `orchestrator`; `configuredVendors` only
+    /// affects what the app reports, not the orchestrators.
     init(
         orchestrator: AIOrchestrator,
         consent: CloudConsentCoordinator,
-        onDeviceOrchestrator: AIOrchestrator? = nil
+        onDeviceOrchestrator: AIOrchestrator? = nil,
+        configuredVendors: Set<CloudVendor> = []
     ) {
         self.keyStore = nil
         self.consent = consent
         self.orchestrator = orchestrator
         self.onDeviceOrchestrator = onDeviceOrchestrator ?? orchestrator
-        self.configuredVendors = []
+        self.configuredVendors = configuredVendors
     }
 
     /// Saves `key` for `vendor` after trimming whitespace. An empty key removes it.
