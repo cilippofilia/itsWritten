@@ -246,4 +246,46 @@ final class ConversationRecoveryTests: ConversationViewModelTestCase {
         XCTAssertTrue(ConversationViewModel.isAppGeneratedCopy(ConversationViewModel.recoveryFailureMessage))
         XCTAssertFalse(ConversationViewModel.isAppGeneratedCopy("Here's what I found."))
     }
+
+    // MARK: - Title generation
+
+    func testResetCancelsTitleSoItCannotUseTheNextGrant() async throws {
+        let gate = GatedProvider.Gate()
+        let cloudCalls = Recorder<String>()
+        let (viewModel, consent) = try makeViewModel(
+            providers: [
+                GatedProvider(gate: gate),
+                cloudProvider(outcome: .success("Old Title"), onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
+            ],
+            consentAnswer: nil
+        )
+
+        let title = Task { await viewModel.generateAndSetTitle(from: "I had a long day") }
+        for _ in 0..<500 where gate.wasEntered == false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(gate.wasEntered, "the title call should be parked in the on-device check")
+
+        viewModel.reset(config: ModelConfiguration())
+        XCTAssertNil(viewModel.titleTask)
+        // The next conversation's grant must not reach the old title call.
+        consent.setAlwaysAllowed(true, for: .vendor(.anthropic))
+        gate.open()
+        await title.value
+
+        XCTAssertTrue(cloudCalls.values.isEmpty, "a superseded title call must not reach the cloud")
+        XCTAssertEqual(viewModel.title, "New Conversation")
+    }
+
+    func testTitleTaskIsStoredWhileRunning() async throws {
+        let (viewModel, _) = try makeViewModel(
+            providers: [MockCapableProvider(outcome: .success("A Fine Title"))],
+            consentAnswer: nil
+        )
+
+        await viewModel.generateAndSetTitle(from: "I had a long day")
+
+        XCTAssertNotNil(viewModel.titleTask)
+        XCTAssertEqual(viewModel.title, "A Fine Title")
+    }
 }

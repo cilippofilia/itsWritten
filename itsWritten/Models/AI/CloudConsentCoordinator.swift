@@ -54,9 +54,11 @@ final class CloudConsentCoordinator {
     /// Returns `false` without prompting for destinations the app cannot
     /// describe, and `true` without prompting when the destination is always
     /// allowed or was allowed earlier in this conversation. Otherwise waits
-    /// for the user's answer. If the calling task is cancelled while waiting,
-    /// returns `false`.
+    /// for the user's answer. If the calling task is cancelled, before or
+    /// while waiting, returns `false`, even for a destination that is allowed:
+    /// a superseded call must never ride on a later conversation's grant.
     func request(_ downgrade: PrivacyDowngrade) async -> Bool {
+        guard !Task.isCancelled else { return false }
         guard let destination = ConsentDestination(provider: downgrade.provider, privacyLevel: downgrade.to) else {
             return false
         }

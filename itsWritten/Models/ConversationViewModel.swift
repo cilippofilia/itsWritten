@@ -57,6 +57,11 @@ final class ConversationViewModel {
     /// The response work started by the latest send. Exposed so tests can await it.
     private(set) var responseTask: Task<Void, Never>?
 
+    /// The title work for the current conversation. Cancelled by `reset` and `resume`,
+    /// so a superseded conversation's title call can never use the next
+    /// conversation's cloud grant.
+    private(set) var titleTask: Task<Void, Never>?
+
     /// Bumped by `reset()` and `resume(thread:config:)`. Captured by in-flight
     /// generation/title work so a stale Task from a superseded conversation can detect
     /// it no longer owns the current state and stop before mutating it.
@@ -100,6 +105,8 @@ final class ConversationViewModel {
     func resume(thread: ChatThread, config: ModelConfiguration) {
         generation += 1
         responseTask?.cancel()
+        titleTask?.cancel()
+        titleTask = nil
         aiProvider?.consent.resetConversationGrants()
         messages = Self.orderedMessages(from: thread.messages)
         title = thread.title
@@ -112,6 +119,8 @@ final class ConversationViewModel {
     func reset(config: ModelConfiguration) {
         generation += 1
         responseTask?.cancel()
+        titleTask?.cancel()
+        titleTask = nil
         aiProvider?.consent.resetConversationGrants()
         messages = []
         title = "New Conversation"
@@ -155,7 +164,17 @@ extension ConversationViewModel {
     /// are swallowed on purpose: this runs after the conversation is already visible,
     /// so an error here should not interrupt the user — it just leaves the
     /// "New Conversation" placeholder.
+    ///
+    /// The work runs in `titleTask`, which `reset` and `resume` cancel; this method
+    /// waits for it.
     func generateAndSetTitle(from prompt: String) async {
+        titleTask?.cancel()
+        let task = Task { await performTitleGeneration(from: prompt) }
+        titleTask = task
+        await task.value
+    }
+
+    private func performTitleGeneration(from prompt: String) async {
         guard let orchestrator = aiProvider?.orchestrator else { return }
         let myGeneration = generation
         let instructions = """
@@ -169,7 +188,7 @@ extension ConversationViewModel {
             instructions: instructions,
             need: .lightweight
         ) else { return }
-        guard myGeneration == generation else { return }
+        guard myGeneration == generation, Task.isCancelled == false else { return }
 
         let normalized = generated
             .replacing("\n", with: " ")

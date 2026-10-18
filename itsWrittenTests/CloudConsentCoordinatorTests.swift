@@ -297,4 +297,37 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         for _ in 0..<100 { await Task.yield() }
         XCTAssertNil(coordinator.pendingRequest)
     }
+
+    func testCancelledTaskIsDeclinedEvenWhenAlwaysAllowed() async {
+        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        coordinator.setAlwaysAllowed(true, for: .vendor(.anthropic))
+        let task = Task {
+            try? await Task.sleep(for: .seconds(10))
+            return await coordinator.request(claudeDowngrade)
+        }
+        task.cancel()
+
+        let allowed = await task.value
+        XCTAssertFalse(allowed)
+        XCTAssertNil(coordinator.pendingRequest)
+    }
+
+    func testCancelledTaskIsDeclinedEvenWithConversationGrant() async throws {
+        let coordinator = CloudConsentCoordinator(defaults: defaults)
+        let first = Task { await coordinator.request(claudeDowngrade) }
+        await waitForPending(coordinator)
+        try answerShown(coordinator, allow: true)
+        let firstAllowed = await first.value
+        XCTAssertTrue(firstAllowed)
+
+        let task = Task {
+            try? await Task.sleep(for: .seconds(10))
+            return await coordinator.request(claudeDowngrade)
+        }
+        task.cancel()
+
+        let allowed = await task.value
+        XCTAssertFalse(allowed)
+        XCTAssertNil(coordinator.pendingRequest)
+    }
 }
