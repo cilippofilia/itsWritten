@@ -95,6 +95,17 @@ final class SensitiveTextDetectorTests: XCTestCase {
         XCTAssertEqual(SensitiveTextDetector.resolvingOverlaps([short, later, long]), [long])
     }
 
+    func testNameSpansDropLeadingLowercaseWords() throws {
+        let text = "Mia sorella Marta Rossi vive a Mosca"
+        let end = try XCTUnwrap(text.range(of: "Marta Rossi")).upperBound
+        let tail = SensitiveTextDetector.capitalizedTail(of: text.startIndex..<end, in: text)
+        XCTAssertEqual(String(text[tail]), "Marta Rossi")
+
+        let name = "Giovanni Bianchi"
+        let whole = name.startIndex..<name.endIndex
+        XCTAssertEqual(SensitiveTextDetector.capitalizedTail(of: whole, in: name), whole)
+    }
+
     func testPlainTextHasNothingToHide() {
         XCTAssertEqual(SensitiveTextDetector.spans(in: "How do I make a good risotto?"), [])
         XCTAssertEqual(SensitiveTextDetector.spans(in: ""), [])

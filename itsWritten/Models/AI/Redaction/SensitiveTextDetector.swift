@@ -70,13 +70,36 @@ enum SensitiveTextDetector {
             case .organizationName: .organization
             default: nil
             }
-            let word = String(text[range])
-            if let kind, word.count >= 2 {
-                spans.append(DetectedSpan(range: range, kind: kind, text: word))
+            if let kind {
+                let trimmed = capitalizedTail(of: range, in: text)
+                let word = String(text[trimmed])
+                if word.count >= 2 {
+                    spans.append(DetectedSpan(range: trimmed, kind: kind, text: word))
+                }
             }
             return true
         }
         return spans
+    }
+
+    /// The trailing run of capitalized words in `range`. `.joinNames` can pull in
+    /// the words before a name ("Mia sorella Marta" in Italian); the name is the
+    /// part after the last lowercase word.
+    static func capitalizedTail(of range: Range<String.Index>, in text: String) -> Range<String.Index> {
+        var start = range.upperBound
+        var index = range.upperBound
+        while index > range.lowerBound {
+            let wordEnd = index
+            while index > range.lowerBound, text[text.index(before: index)].isWhitespace == false {
+                index = text.index(before: index)
+            }
+            guard text[index..<wordEnd].first?.isUppercase == true else { break }
+            start = index
+            while index > range.lowerBound, text[text.index(before: index)].isWhitespace {
+                index = text.index(before: index)
+            }
+        }
+        return start < range.upperBound ? start..<range.upperBound : range
     }
 
     // MARK: - Addresses, phone numbers, links, dates
