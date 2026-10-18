@@ -34,6 +34,8 @@ struct AINotEnabledView: View {
                     Label("Open Settings", systemImage: "gear")
                 }
                 .buttonStyle(.borderedProminent)
+
+                CloudFallbackButton()
             }
             .padding()
             .toolbar {
@@ -60,4 +62,5 @@ struct AINotEnabledView: View {
 
 #Preview {
     AINotEnabledView()
+        .environment(AIProviderStore())
 }

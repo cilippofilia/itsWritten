@@ -40,6 +40,8 @@ struct DeviceNotSupportedView: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+
+                CloudFallbackButton()
             }
             .padding()
             .toolbar {
@@ -66,4 +68,5 @@ struct DeviceNotSupportedView: View {
 
 #Preview {
     DeviceNotSupportedView()
+        .environment(AIProviderStore())
 }

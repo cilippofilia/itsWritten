@@ -40,6 +40,8 @@ struct ModelNotReadyView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(retryCountdown > 0)
+
+            CloudFallbackButton()
         }
         .padding()
         .task(id: retryCountdown) {
@@ -55,4 +57,5 @@ struct ModelNotReadyView: View {
 
 #Preview {
     ModelNotReadyView(action: { })
+        .environment(AIProviderStore())
 }

@@ -26,6 +26,8 @@ struct UnknownReasonView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+
+                CloudFallbackButton()
             }
             .padding()
             .toolbar {
@@ -52,4 +54,5 @@ struct UnknownReasonView: View {
 
 #Preview {
     UnknownReasonView(action: { })
+        .environment(AIProviderStore())
 }
