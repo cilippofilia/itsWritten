@@ -45,7 +45,7 @@ struct OnboardingView: View {
         .init(
             title: "Your words stay yours",
             detail: """
-                Cloud models like Claude, OpenAI or Gemini are optional and use your own key. You’re asked \
+                Cloud models like Claude, ChatGPT or Gemini are optional and use your own key. You’re asked \
                 first, and names, places and other personal details are hidden before anything is sent.
                 """,
             systemImage: "eye.slash",
