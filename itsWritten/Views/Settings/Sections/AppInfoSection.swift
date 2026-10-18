@@ -20,7 +20,6 @@ struct AppInfoSection: View {
     var body: some View {
         Section {
             LabeledContent("Version", value: resolvedVersion)
-            LabeledContent("Model", value: "Apple Intelligence")
             LabeledContent("iOS", value: osVersion)
         } header: {
             Text("App Info")

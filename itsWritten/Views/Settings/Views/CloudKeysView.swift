@@ -5,24 +5,19 @@
 
 import SwiftUI
 
-/// Standalone screen for managing cloud API keys.
+/// `CloudModelsView` presented on its own, e.g. from the unavailable screen.
 @available(iOS 26.0, *)
 struct CloudKeysView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            Form {
-                CloudKeysSection()
-            }
-            .formStyle(.grouped)
-            .navigationTitle("Cloud Models")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+            CloudModelsView()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
                 }
-            }
         }
     }
 }
