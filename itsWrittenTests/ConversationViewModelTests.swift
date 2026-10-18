@@ -13,7 +13,7 @@ import XCTest
 @testable import itsWritten
 
 @MainActor
-final class ConversationViewModelTests: XCTestCase {
+final class ConversationViewModelTests: ConversationViewModelTestCase {
     func testInitialStateIsComposing() {
         let viewModel = ConversationViewModel()
 
@@ -147,97 +147,6 @@ final class ConversationViewModelTests: XCTestCase {
 
     // MARK: - Orchestrator
 
-    /// A store whose orchestrator has no providers, for tests that never call a model.
-    private func idleStore() -> AIProviderStore {
-        AIProviderStore(orchestrator: AIOrchestrator(providers: []), consent: CloudConsentCoordinator())
-    }
-
-    private var container: ModelContainer?
-    private var consentAnswerer: Task<Void, Never>?
-
-    override func tearDown() async throws {
-        consentAnswerer?.cancel()
-        consentAnswerer = nil
-        container = nil
-        try await super.tearDown()
-    }
-
-    /// Builds a configured view model backed by `providers`. When `consentAnswer`
-    /// is non-nil, a background task answers every consent prompt with it.
-    private func makeViewModel(
-        providers: [any ModelProvider],
-        onDeviceProviders: [any ModelProvider]? = nil,
-        consentAnswer: Bool?,
-        alwaysAllowed: ConsentDestination? = nil
-    ) throws -> (ConversationViewModel, CloudConsentCoordinator) {
-        let consent = CloudConsentCoordinator(defaults: UserDefaults(suiteName: UUID().uuidString)!)
-        let orchestrator = AIOrchestrator(
-            providers: providers,
-            privacyDisclosure: .askOnPrivacyChange { await consent.request($0) }
-        )
-        if let alwaysAllowed {
-            consent.setAlwaysAllowed(true, for: alwaysAllowed)
-        }
-        let onDeviceOrchestrator = onDeviceProviders.map { AIOrchestrator(providers: $0) }
-        let store = AIProviderStore(
-            orchestrator: orchestrator,
-            consent: consent,
-            onDeviceOrchestrator: onDeviceOrchestrator
-        )
-
-        let schema = Schema([ChatThread.self, ChatMessage.self])
-        let configuration = SwiftData.ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [configuration])
-        self.container = container
-
-        let viewModel = ConversationViewModel()
-        viewModel.configure(
-            modelContext: ModelContext(container),
-            pubMedStore: PubMedToolStore(),
-            crossPromoSignal: CrossPromoSignal(),
-            aiProvider: store
-        )
-
-        if let consentAnswer {
-            consentAnswerer = Task { @MainActor in
-                for _ in 0..<500 {
-                    if let request = consent.pendingRequest {
-                        consent.respond(to: request.id, allow: consentAnswer)
-                    }
-                    do {
-                        try await Task.sleep(for: .milliseconds(10))
-                    } catch {
-                        return
-                    }
-                }
-            }
-        }
-        return (viewModel, consent)
-    }
-
-    private func cloudProvider(
-        outcome: Result<String, ProviderError> = .success("hi"),
-        onRespond: (@Sendable (String, String?, [ChatTurn]) -> Void)? = nil
-    ) -> MockProvider {
-        MockProvider(
-            identifier: .userAccount(.anthropic),
-            privacyLevel: .external,
-            outcome: outcome,
-            onRespond: onRespond
-        )
-    }
-
-    private func waitForPendingConsent(_ consent: CloudConsentCoordinator) async throws {
-        for _ in 0..<500 where consent.pendingRequest == nil {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        XCTAssertNotNil(consent.pendingRequest, "expected a consent prompt")
-    }
-
-    private func assistantMessages(_ viewModel: ConversationViewModel) -> [ChatMessage] {
-        viewModel.messages.filter { $0.isUser == false }
-    }
-
     func testOnDeviceReplyHasNoProviderName() async throws {
         let (viewModel, _) = try makeViewModel(
             providers: [MockCapableProvider(outcome: .success("ok"))],
@@ -359,44 +268,6 @@ final class ConversationViewModelTests: XCTestCase {
         XCTAssertFalse(second.history.contains(.user("Tell me more")))
     }
 
-    func testTitleDeclinedKeepsPlaceholder() async throws {
-        let (viewModel, _) = try makeViewModel(
-            providers: [
-                MockCapableProvider(availability: .unavailable(reason: "test")),
-                cloudProvider(outcome: .success("A Cloud Title"))
-            ],
-            consentAnswer: false
-        )
-
-        await viewModel.generateAndSetTitle(from: "I had a long day")
-
-        XCTAssertEqual(viewModel.title, "New Conversation")
-    }
-
-    func testGuardrailRetryNeverReachesCloud() async throws {
-        let cloudCalls = Recorder<String>()
-        let (viewModel, _) = try makeViewModel(
-            // The second on-device call fails recoverably, so a retry through the main
-            // chain would fall back to the always-allowed cloud provider.
-            providers: [
-                SequencedProvider(outcomes: [.failure(.guardrailViolation("x")), .failure(.rateLimited(retryAfter: nil))]),
-                cloudProvider(outcome: .success("cloud"), onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
-            ],
-            onDeviceProviders: [MockCapableProvider(outcome: .failure(.rateLimited(retryAfter: nil)))],
-            consentAnswer: nil,
-            alwaysAllowed: .vendor(.anthropic)
-        )
-
-        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .standard)
-        await viewModel.responseTask?.value
-
-        XCTAssertTrue(cloudCalls.values.isEmpty, "guardrail-blocked content must never reach the cloud")
-        XCTAssertEqual(
-            viewModel.messages.last?.content,
-            "I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat."
-        )
-    }
-
     func testSendMarksRespondingSynchronously() async throws {
         let (viewModel, _) = try makeViewModel(
             providers: [MockCapableProvider(outcome: .success("ok"))],
@@ -429,41 +300,3 @@ final class ConversationViewModelTests: XCTestCase {
     }
 }
 
-/// A prompt and history captured from a mock provider.
-private struct RecordedRequest: Sendable {
-    let prompt: String
-    let history: [ChatTurn]
-}
-
-/// Thread-safe append-only log for values captured in `@Sendable` mock callbacks.
-private final class Recorder<Value: Sendable>: Sendable {
-    private let storage = Mutex<[Value]>([])
-
-    var values: [Value] {
-        storage.withLock { $0 }
-    }
-
-    func append(_ value: Value) {
-        storage.withLock { $0.append(value) }
-    }
-}
-
-/// On-device plain provider that returns `outcomes` in order, repeating the last one.
-private struct SequencedProvider: ModelProvider {
-    let identifier = ProviderIdentifier.onDevice
-    let privacyLevel = PrivacyLevel.onDevice
-    let outcomes: [Result<String, ProviderError>]
-    private let callCount = Recorder<Int>()
-
-    init(outcomes: [Result<String, ProviderError>]) {
-        self.outcomes = outcomes
-    }
-
-    func availability() async -> ProviderAvailability { .available }
-
-    func respond(to prompt: String, instructions: String?, history: [ChatTurn]) async throws -> String {
-        let index = callCount.values.count
-        callCount.append(index)
-        return try outcomes[min(index, outcomes.count - 1)].get()
-    }
-}

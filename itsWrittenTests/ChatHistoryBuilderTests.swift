@@ -10,14 +10,14 @@ final class ChatHistoryBuilderTests: XCTestCase {
         _ messages: [ChatMessage],
         excludingLastAssistant: Bool = false,
         excludingTrailingUser: Bool = false,
-        isRefusal: @escaping (String) -> Bool = { _ in false },
+        isExcluded: @escaping (String) -> Bool = { _ in false },
         budget: Int = 4000
     ) -> [ChatTurn] {
         ChatHistoryBuilder.turns(
             from: messages,
             excludingLastAssistant: excludingLastAssistant,
             excludingTrailingUser: excludingTrailingUser,
-            isRefusal: isRefusal,
+            isExcluded: isExcluded,
             characterBudget: budget
         )
     }
@@ -36,7 +36,7 @@ final class ChatHistoryBuilderTests: XCTestCase {
     }
 
     func testSkipsRefusals() {
-        XCTAssertEqual(build([user("a"), assistant("no")], isRefusal: { $0 == "no" }), [.user("a")])
+        XCTAssertEqual(build([user("a"), assistant("no")], isExcluded: { $0 == "no" }), [.user("a")])
     }
 
     func testBudgetKeepsMostRecent() {
@@ -51,5 +51,25 @@ final class ChatHistoryBuilderTests: XCTestCase {
 
     func testZeroBudgetIsEmpty() {
         XCTAssertEqual(build([user("a"), assistant("b")], budget: 0), [])
+    }
+
+    func testSkipsBlockedUserTurnAndItsReply() {
+        let blocked = ChatMessage(content: "blocked", isUser: true, wasBlocked: true)
+        let messages = [user("a"), assistant("b"), blocked, assistant("failure copy"), user("c"), assistant("d")]
+        XCTAssertEqual(build(messages), [.user("a"), .assistant("b"), .user("c"), .assistant("d")])
+    }
+
+    func testBlockedTrailingTurnLeavesEarlierTurnsIntact() {
+        let blocked = ChatMessage(content: "blocked", isUser: true, wasBlocked: true)
+        XCTAssertEqual(build([user("a"), assistant("b"), blocked]), [.user("a"), .assistant("b")])
+    }
+
+    func testSkipsExcludedAppCopy() {
+        let copy = ConversationViewModel.stayedOnDeviceMessage
+        let messages = [user("a"), assistant(copy), user("c")]
+        XCTAssertEqual(
+            build(messages, isExcluded: ConversationViewModel.isAppGeneratedCopy),
+            [.user("a"), .user("c")]
+        )
     }
 }

@@ -6,14 +6,16 @@ enum ChatHistoryBuilder {
     ///
     /// `messages` must already be ordered (`ConversationViewModel.orderedMessages`).
     /// Exclusions are applied in this order: the trailing user message, the last
-    /// assistant message, then refusal assistant messages. The most recent turns whose
-    /// summed `text.count` fits `characterBudget` are kept; collection stops at the
-    /// first turn that does not fit.
+    /// assistant message, then blocked user messages (`wasBlocked`) together with the
+    /// assistant reply right after each, then assistant messages `isExcluded` matches
+    /// (refusals and app-generated copy). The most recent turns whose summed
+    /// `text.count` fits `characterBudget` are kept; collection stops at the first turn
+    /// that does not fit.
     static func turns(
         from messages: [ChatMessage],
         excludingLastAssistant: Bool,
         excludingTrailingUser: Bool,
-        isRefusal: (String) -> Bool,
+        isExcluded: (String) -> Bool,
         characterBudget: Int
     ) -> [ChatTurn] {
         var remaining = messages[...]
@@ -24,9 +26,21 @@ enum ChatHistoryBuilder {
             remaining = remaining.dropLast()
         }
 
-        let candidates = remaining
-            .filter { $0.isUser || isRefusal($0.content) == false }
-            .map { $0.isUser ? ChatTurn.user($0.content) : ChatTurn.assistant($0.content) }
+        var candidates: [ChatTurn] = []
+        var skipsNextReply = false
+        for message in remaining {
+            if message.isUser {
+                skipsNextReply = message.wasBlocked
+                if message.wasBlocked == false {
+                    candidates.append(.user(message.content))
+                }
+            } else if skipsNextReply {
+                // The failure reply to a blocked turn goes with it.
+                skipsNextReply = false
+            } else if isExcluded(message.content) == false {
+                candidates.append(.assistant(message.content))
+            }
+        }
 
         var kept: [ChatTurn] = []
         var total = 0

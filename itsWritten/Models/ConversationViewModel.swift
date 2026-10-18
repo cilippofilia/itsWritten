@@ -28,7 +28,17 @@ final class ConversationViewModel {
 
     /// Shown in place of a reply when no on-device answer was possible and the user
     /// declined (or had no) cloud fallback.
-    static let stayedOnDeviceMessage = "This stayed on your device. Apple Intelligence couldn't answer, and nothing was sent to a cloud model."
+    static let stayedOnDeviceMessage = """
+        This stayed on your device. Apple Intelligence couldn't answer, and nothing was sent to a cloud model.
+        """
+
+    /// Shown when a turn couldn't be answered even after a retry.
+    static let recoveryFailureMessage = """
+        I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat.
+        """
+
+    /// Shown when the human-style response fails outright.
+    static let genericErrorMessage = "Sorry, I couldn't generate a response."
 
     /// Total character budget for instructions plus history, matching the previous
     /// transcript compaction.
@@ -179,7 +189,8 @@ extension ConversationViewModel {
         guard prompt.isReallyEmpty == false, aiProvider != nil else { return }
         pubMedStore?.reset()
         let trimmedPrompt = prompt.trimmed
-        append(ChatMessage(content: trimmedPrompt, isUser: true))
+        let userMessage = ChatMessage(content: trimmedPrompt, isUser: true)
+        append(userMessage)
 
         let resolvedPrompt = resolvedMedicalPrompt(for: trimmedPrompt)
 
@@ -192,6 +203,7 @@ extension ConversationViewModel {
         let request = ModelRequest(
             instructions: instructions,
             options: config.generationOptions,
+            userMessage: userMessage,
             snapshot: Self.orderedMessages(from: messages),
             characterBudget: max(0, Self.contextCharacterBudget - (instructions?.count ?? 0))
         )
@@ -219,7 +231,7 @@ extension ConversationViewModel {
         guard let orchestrator = aiProvider?.orchestrator else { return }
         let usage = await orchestrator.contextUsage(
             instructions: request.instructions,
-            history: request.history(isRefusal: isRefusalMessage)
+            history: request.history(isExcluded: isExcludedFromHistory)
         )
         guard (usage?.fraction ?? 0) >= Self.contextCompactionThreshold else { return }
         request.characterBudget /= 2
@@ -235,6 +247,7 @@ extension ConversationViewModel {
         let response = await generateResponseWithRecovery(for: prompt, request: request)
         guard generation == self.generation else { return }
         if let response {
+            finish(response, for: request)
             append(makeAssistantMessage(from: response))
         } else {
             appendRecoveryFailureMessage()
@@ -273,6 +286,7 @@ extension ConversationViewModel {
                     guard generation == self.generation else { return }
                     final = recovered ?? recoveryFailureResponse
                 }
+                finish(final, for: request)
                 replaceStreamedMessage(
                     at: &messageIndex,
                     with: makeAssistantMessage(from: final, id: messageId, timestamp: timestamp)
@@ -282,6 +296,9 @@ extension ConversationViewModel {
             guard generation == self.generation else { return }
             var final = stayedOnDeviceResponse
             let kind = Self.failureKind(of: error)
+            if kind == .guardrailViolation {
+                markBlocked(request)
+            }
             if kind != .staysOnDevice {
                 let recovered = await recoverAfterFailure(
                     for: prompt,
@@ -291,6 +308,7 @@ extension ConversationViewModel {
                 guard generation == self.generation else { return }
                 final = recovered ?? recoveryFailureResponse
             }
+            finish(final, for: request)
             replaceStreamedMessage(
                 at: &messageIndex,
                 with: makeAssistantMessage(from: final, id: messageId, timestamp: timestamp)
@@ -314,7 +332,7 @@ extension ConversationViewModel {
         let stream = await orchestrator.streamDetailed(
             to: prompt,
             instructions: request.instructions,
-            history: request.history(isRefusal: isRefusalMessage),
+            history: request.history(isExcluded: isExcludedFromHistory),
             tools: AppLanguageModel.tools,
             options: request.options
         )
@@ -380,6 +398,7 @@ extension ConversationViewModel {
             }
 
             guard generation == self.generation else { return }
+            finish(response, for: request)
             append(makeAssistantMessage(from: response))
         } catch {
             guard generation == self.generation else { return }
@@ -392,11 +411,11 @@ extension ConversationViewModel {
     }
 
     private func appendErrorMessage() {
-        append(ChatMessage(content: "Sorry, I couldn't generate a response.", isUser: false))
+        append(ChatMessage(content: Self.genericErrorMessage, isUser: false))
     }
 
     private func appendRecoveryFailureMessage() {
-        append(ChatMessage(content: recoveryFailureMessage, isUser: false))
+        append(ChatMessage(content: Self.recoveryFailureMessage, isUser: false))
     }
 
     private func sanitizedResponse(_ response: String) -> String {
@@ -421,7 +440,7 @@ extension ConversationViewModel {
                 let response = try await orchestrator.respondDetailed(
                     to: preparedPrompt,
                     instructions: request.instructions,
-                    history: request.history(isRefusal: isRefusalMessage),
+                    history: request.history(isExcluded: isExcludedFromHistory),
                     tools: AppLanguageModel.tools,
                     options: request.options
                 )
@@ -434,6 +453,7 @@ extension ConversationViewModel {
         } catch {
             switch Self.failureKind(of: error) {
             case .guardrailViolation:
+                markBlocked(request)
                 return await recoverAfterFailure(for: prompt, request: request, onDeviceOnly: true)
             case .contextWindowExceeded:
                 return await recoverAfterFailure(for: prompt, request: request)
@@ -462,7 +482,7 @@ extension ConversationViewModel {
                 let response = try await orchestrator.respondDetailed(
                     to: preparedPrompt,
                     instructions: request.instructions,
-                    history: request.history(excludingLastAssistant: true, isRefusal: isRefusalMessage),
+                    history: request.history(excludingLastAssistant: true, isExcluded: isExcludedFromHistory),
                     tools: AppLanguageModel.tools,
                     options: request.options
                 )
@@ -470,7 +490,11 @@ extension ConversationViewModel {
                 return isRefusalMessage(assistantResponse.content) ? nil : assistantResponse
             }
         } catch {
-            return Self.failureKind(of: error) == .staysOnDevice ? stayedOnDeviceResponse : nil
+            let kind = Self.failureKind(of: error)
+            if kind == .guardrailViolation {
+                markBlocked(request)
+            }
+            return kind == .staysOnDevice ? stayedOnDeviceResponse : nil
         }
     }
 
@@ -501,16 +525,44 @@ extension ConversationViewModel {
         return Self.refusalPhrases.contains { normalized.localizedStandardContains($0) }
     }
 
-    private var recoveryFailureMessage: String {
-        "I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat."
-    }
-
     private var recoveryFailureResponse: AssistantResponse {
-        AssistantResponse(content: recoveryFailureMessage, toolNames: [], toolSources: [], providerName: nil)
+        Self.appCopyResponse(Self.recoveryFailureMessage)
     }
 
     private var stayedOnDeviceResponse: AssistantResponse {
-        AssistantResponse(content: Self.stayedOnDeviceMessage, toolNames: [], toolSources: [], providerName: nil)
+        Self.appCopyResponse(Self.stayedOnDeviceMessage)
+    }
+
+    private static func appCopyResponse(_ content: String) -> AssistantResponse {
+        AssistantResponse(content: content, toolNames: [], toolSources: [], providerName: nil, isAppCopy: true)
+    }
+
+    /// Whether `content` is copy the app shows in place of an answer. Such replies
+    /// carry no conversation content, so they are left out of the history.
+    static func isAppGeneratedCopy(_ content: String) -> Bool {
+        appGeneratedCopy.contains(content)
+    }
+
+    private static var appGeneratedCopy: Set<String> {
+        [stayedOnDeviceMessage, recoveryFailureMessage, genericErrorMessage]
+    }
+
+    /// Assistant replies to leave out of the history: model refusals and app copy.
+    private func isExcludedFromHistory(_ content: String) -> Bool {
+        isRefusalMessage(content) || Self.isAppGeneratedCopy(content)
+    }
+
+    /// Records that the on-device guardrails blocked this turn. Cleared again if the
+    /// turn still ends in a model answer (see `finish(_:for:)`).
+    private func markBlocked(_ request: ModelRequest) {
+        request.userMessage.wasBlocked = true
+    }
+
+    /// Clears a guardrail mark when the turn ended in a real answer after all.
+    private func finish(_ response: AssistantResponse, for request: ModelRequest) {
+        if response.isAppCopy == false {
+            request.userMessage.wasBlocked = false
+        }
     }
 
     private func buildAssistantResponse(from response: AIResponse) -> AssistantResponse {
@@ -546,7 +598,8 @@ extension ConversationViewModel {
                     content: "I couldn't find relevant human PubMed evidence for that question. Try being more specific about the condition, treatment, or outcome you want to check.",
                     toolNames: [],
                     toolSources: [],
-                    providerName: nil
+                    providerName: nil,
+                    isAppCopy: true
                 )
             )
         } catch PubMedSearchError.rateLimited {
@@ -555,7 +608,8 @@ extension ConversationViewModel {
                     content: "PubMed is temporarily rate-limiting requests, so I couldn't verify that with research right now. Try again in a moment.",
                     toolNames: [],
                     toolSources: [],
-                    providerName: nil
+                    providerName: nil,
+                    isAppCopy: true
                 )
             )
         } catch {
@@ -564,7 +618,8 @@ extension ConversationViewModel {
                     content: "I couldn't retrieve PubMed evidence right now, so I don't want to guess. Try again in a moment or rephrase the question more specifically.",
                     toolNames: [],
                     toolSources: [],
-                    providerName: nil
+                    providerName: nil,
+                    isAppCopy: true
                 )
             )
         }
@@ -700,6 +755,8 @@ private struct AssistantResponse {
     let toolSources: [ChatMessageSource]
     /// Display name of the cloud model that answered; `nil` on device.
     let providerName: String?
+    /// `true` for copy the app wrote in place of a model answer.
+    var isAppCopy = false
 }
 
 /// The full text of a streamed reply and who wrote it.
@@ -724,18 +781,21 @@ private enum FailureKind {
 private struct ModelRequest {
     let instructions: String?
     let options: GenerationOptions
+    /// The in-flight user message. Marked `wasBlocked` when its turn ends in a
+    /// guardrail failure.
+    let userMessage: ChatMessage
     /// The ordered conversation at send time, ending with the in-flight user message.
     let snapshot: [ChatMessage]
     /// Character budget for history turns; halved when the context is nearly full.
     var characterBudget: Int
 
     /// The history to send, without the in-flight user message (it is the prompt).
-    func history(excludingLastAssistant: Bool = false, isRefusal: (String) -> Bool) -> [ChatTurn] {
+    func history(excludingLastAssistant: Bool = false, isExcluded: (String) -> Bool) -> [ChatTurn] {
         ChatHistoryBuilder.turns(
             from: snapshot,
             excludingLastAssistant: excludingLastAssistant,
             excludingTrailingUser: true,
-            isRefusal: isRefusal,
+            isExcluded: isExcluded,
             characterBudget: characterBudget
         )
     }
