@@ -10,6 +10,13 @@ import VoltaSDK
 /// Owns the app's `AIOrchestrator` and the user's cloud API keys.
 ///
 /// Any key change rebuilds the orchestrator so new accounts take effect immediately.
+///
+/// - Warning: Don't pass `.reasoning` or `.largeContext` as a `ModelNeed` without a
+///   consent design for it. Those needs reorder the chain so Private Cloud Compute and
+///   external providers lead, which makes a cloud provider the privacy baseline: the
+///   `.askOnPrivacyChange` gate sees no downgrade for that leading provider and never
+///   prompts for it, so text would leave the device without a "yes". The app only uses the default order and
+///   `.lightweight`, which keep on-device first.
 @MainActor
 @Observable
 final class AIProviderStore {

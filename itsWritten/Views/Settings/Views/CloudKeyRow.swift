@@ -30,8 +30,8 @@ struct CloudKeyRow: View {
             isAlwaysAllowed = aiProvider.consent.isAlwaysAllowed(destination)
         }
 
+        // No `.textContentType(.password)`: API keys shouldn't be offered to iCloud Keychain.
         SecureField("API Key", text: $draftKey)
-            .textContentType(.password)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .onChange(of: draftKey) {
@@ -50,7 +50,9 @@ struct CloudKeyRow: View {
                 .foregroundStyle(.red)
         }
 
-        Link("Find model names", destination: vendor.modelDocumentationURL)
+        if let apiKeyPageURL = vendor.apiKeyPageURL {
+            Link("Get an API key", destination: apiKeyPageURL)
+        }
 
         if hasKey {
             Toggle("Always Allow", isOn: alwaysAllowed(for: destination))
