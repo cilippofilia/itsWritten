@@ -55,6 +55,39 @@ final class ConversationRecoveryTests: ConversationViewModelTestCase {
         )
     }
 
+    func testStreamingGuardrailRetryNeverReachesCloud() async throws {
+        let cloudCalls = Recorder<String>()
+        let onDeviceCalls = Recorder<MockCapableProvider.Call>()
+        let (viewModel, _) = try makeViewModel(
+            // Same setup as the standard test: a retry through the main chain would
+            // fall back to the always-allowed cloud provider.
+            providers: [
+                SequencedProvider(outcomes: [
+                    .failure(.guardrailViolation("x")),
+                    .failure(.rateLimited(retryAfter: nil))
+                ]),
+                cloudProvider(outcome: .success("cloud"), onRespond: { prompt, _, _ in cloudCalls.append(prompt) })
+            ],
+            onDeviceProviders: [
+                MockCapableProvider(
+                    outcome: .failure(.rateLimited(retryAfter: nil)),
+                    onCall: { onDeviceCalls.append($0) }
+                )
+            ],
+            consentAnswer: nil,
+            alwaysAllowed: .vendor(.anthropic)
+        )
+
+        viewModel.startConversation(with: "I had a long day", config: ModelConfiguration(), responseType: .streaming)
+        await viewModel.responseTask?.value
+
+        XCTAssertTrue(cloudCalls.values.isEmpty, "guardrail-blocked content must never reach the cloud")
+        XCTAssertEqual(onDeviceCalls.values.count, 1, "the retry should run on the on-device-only orchestrator")
+        XCTAssertEqual(assistantMessages(viewModel).count, 1)
+        XCTAssertEqual(viewModel.messages.last?.content, ConversationViewModel.recoveryFailureMessage)
+        XCTAssertEqual(viewModel.messages.first?.wasBlocked, true)
+    }
+
     func testBlockedTurnIsLeftOutOfLaterHistory() async throws {
         let requests = Recorder<RecordedRequest>()
         let (viewModel, _) = try makeViewModel(
