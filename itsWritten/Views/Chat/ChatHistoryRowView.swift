@@ -24,16 +24,17 @@ struct ChatHistoryRowView: View {
             }
             .padding()
             .background(Color(.secondarySystemBackground))
-            .clipShape(.rect(cornerRadius: 12, style: .continuous))
+            .clipShape(.rect(cornerRadius: 24, style: .continuous))
             .contentShape(.rect)
         }
         .padding(.bottom)
         .overlay(alignment: .bottomTrailing) {
             HStack {
-                Spacer()
                 Text(thread.lastUpdated, formatter: Self.timestampFormatter)
                     .foregroundStyle(.secondary)
                     .font(.footnote)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing)
             }
         }
     }
@@ -52,4 +53,6 @@ struct ChatHistoryRowView: View {
 @available(iOS 26.0, *)
 #Preview {
     ChatHistoryRowView(thread: .sampleThreads.first!)
+        .padding(.horizontal, 4)
+        .preferredColorScheme(.dark)
 }
