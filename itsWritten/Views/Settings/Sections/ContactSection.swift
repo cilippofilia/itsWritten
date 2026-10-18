@@ -78,7 +78,7 @@ struct ContactSection: View {
             }
             .buttonStyle(.plain)
         } header: {
-            Text("Contacts")
+            Text("Support")
         }
     }
 

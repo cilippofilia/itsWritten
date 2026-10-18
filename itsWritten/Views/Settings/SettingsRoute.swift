@@ -9,7 +9,8 @@ import Foundation
 
 /// Screens pushed from `ModelSettingsSheet`.
 enum SettingsRoute: Hashable {
-    case provider
+    case appleIntelligence
+    case cloudModels
     case instructions
     case generation
 }

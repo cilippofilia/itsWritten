@@ -16,7 +16,13 @@ struct ModelSettingsSheet: View {
     var body: some View {
         Form {
             Section {
-                NavigationLink("Provider", value: SettingsRoute.provider)
+                NavigationLink("Apple Intelligence", value: SettingsRoute.appleIntelligence)
+                CloudModelsLink()
+            } footer: {
+                Text("Answers come from your device first. Cloud models are optional and only used with your own key, after you agree.")
+            }
+
+            Section {
                 NavigationLink("Instructions", value: SettingsRoute.instructions)
                 NavigationLink("Generation", value: SettingsRoute.generation)
             } footer: {
@@ -37,8 +43,10 @@ struct ModelSettingsSheet: View {
         .formStyle(.grouped)
         .navigationDestination(for: SettingsRoute.self) { route in
             switch route {
-            case .provider:
-                ProviderView()
+            case .appleIntelligence:
+                AppleIntelligenceView()
+            case .cloudModels:
+                CloudModelsView()
             case .instructions:
                 InstructionSection(configuration: $configuration)
                     .navigationTitle("Instructions")

@@ -35,9 +35,21 @@ struct OnboardingView: View {
         ),
         .init(
             title: "Your pace, your privacy",
-            detail: "You stay in control of your entries and how you engage with them. Apple Intelligence runs on your device, and private cloud requests aren’t stored or shared.",
+            detail: """
+                You stay in control of your entries and how you engage with them. Apple Intelligence runs on \
+                your device, and Apple’s Private Cloud Compute doesn’t store or share what you write.
+                """,
             systemImage: "hand.raised",
             accent: .indigo
+        ),
+        .init(
+            title: "Your words stay yours",
+            detail: """
+                Cloud models like Claude, ChatGPT or Gemini are optional and use your own key. You’re asked \
+                first, and names, places and other personal details are hidden before anything is sent.
+                """,
+            systemImage: "eye.slash",
+            accent: .teal
         )
     ]
 

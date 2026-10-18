@@ -185,14 +185,14 @@ extension ConversationViewModel {
         Return only the title text.
         """
 
-        guard let generated = try? await orchestrator.respond(
+        guard let response = try? await orchestrator.respondDetailed(
             to: prompt,
             instructions: instructions,
             need: .lightweight
         ) else { return }
         guard myGeneration == generation, Task.isCancelled == false else { return }
 
-        let normalized = generated
+        let normalized = restoredText(of: response)
             .replacing("\n", with: " ")
             .replacing("#", with: "")
             .replacing("-", with: " ")
@@ -341,6 +341,7 @@ extension ConversationViewModel {
         guard let orchestrator = aiProvider?.orchestrator else { return nil }
         var content = ""
         var providerName: String?
+        var isExternal = false
         let stream = await orchestrator.streamDetailed(
             to: prompt,
             instructions: request.instructions,
@@ -354,11 +355,14 @@ extension ConversationViewModel {
             switch event {
             case .began(let provider, let privacyLevel):
                 providerName = Self.providerName(provider: provider, privacyLevel: privacyLevel)
+                isExternal = privacyLevel == .external
             case .text(let delta):
                 content += delta
+                // A vendor wrote placeholders; show the real words, never half a placeholder.
+                let shown = isExternal ? (aiProvider?.consent.restoreForDisplay(content) ?? content) : content
                 let message = ChatMessage(
                     id: placeholder.id,
-                    content: content,
+                    content: shown,
                     isUser: false,
                     timestamp: placeholder.timestamp,
                     providerName: providerName
@@ -374,7 +378,8 @@ extension ConversationViewModel {
             }
         }
         guard generation == self.generation else { return nil }
-        return StreamedReply(content: content, providerName: providerName)
+        let restored = isExternal ? (aiProvider?.consent.restore(content) ?? content) : content
+        return StreamedReply(content: restored, providerName: providerName)
     }
 
     private func replaceStreamedMessage(at messageIndex: inout Int?, with message: ChatMessage) {
@@ -672,9 +677,16 @@ extension ConversationViewModel {
 
     private func buildAssistantResponse(from response: AIResponse) -> AssistantResponse {
         buildAssistantResponse(
-            from: response.text,
+            from: restoredText(of: response),
             providerName: Self.providerName(provider: response.provider, privacyLevel: response.privacyLevel)
         )
+    }
+
+    /// The response text with the real words put back when a third-party vendor
+    /// wrote it (it only ever saw placeholders).
+    private func restoredText(of response: AIResponse) -> String {
+        guard response.privacyLevel == .external, let consent = aiProvider?.consent else { return response.text }
+        return consent.restore(response.text)
     }
 
     private func buildAssistantResponse(from content: String, providerName: String?) -> AssistantResponse {

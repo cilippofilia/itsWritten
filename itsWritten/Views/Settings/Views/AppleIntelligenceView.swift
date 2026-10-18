@@ -1,5 +1,5 @@
 //
-//  ProviderView.swift
+//  AppleIntelligenceView.swift
 //  itsWritten
 //
 //  Created by Filippo Cilia on 24/05/2026.
@@ -9,7 +9,8 @@ import FoundationModels
 import SwiftUI
 
 @available(iOS 26.0, *)
-struct ProviderView: View {
+/// The on-device model and the languages it supports.
+struct AppleIntelligenceView: View {
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
 
@@ -29,8 +30,8 @@ struct ProviderView: View {
                     .symbolRenderingMode(.multicolor)
             } footer: {
                 Text("""
-                Apple Intelligence runs on your device by default. If it can't answer and you've \
-                added your own API key, itsWritten asks before sending anything to a cloud model.
+                Apple Intelligence runs on your device. When it can't answer, Apple Private Cloud \
+                Compute can help after you agree; it doesn't store or share what you write.
                 """)
             }
 
@@ -53,8 +54,6 @@ struct ProviderView: View {
                 Text("Language Support")
             }
 
-            CloudKeysSection()
-
             Section("Supported Languages") {
                 ForEach(supportedLanguageNames, id: \.self) { name in
                     Text(name)
@@ -62,7 +61,8 @@ struct ProviderView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Provider")
+        .navigationTitle("Apple Intelligence")
+        .navigationBarTitleDisplayMode(.inline)
         .task(id: locale) {
             supportedLanguageNames = model.supportedLanguages
                 .map { $0.displayName(in: locale) }
@@ -80,6 +80,6 @@ struct ProviderView: View {
 @available(iOS 26.0, *)
 #Preview {
     NavigationStack {
-        ProviderView()
+        AppleIntelligenceView()
     }
 }
