@@ -15,6 +15,8 @@ struct CloudKeyRow: View {
     /// Held only until Save; cleared afterwards and never stored elsewhere.
     @State private var draftKey = ""
     @State private var errorMessage: String?
+    /// Mirrors the coordinator's UserDefaults-backed value, which isn't observable.
+    @State private var isAlwaysAllowed = false
 
     var body: some View {
         let destination = ConsentDestination.vendor(vendor)
@@ -24,11 +26,17 @@ struct CloudKeyRow: View {
             Text(hasKey ? "Key saved" : "No key")
                 .foregroundStyle(.secondary)
         }
+        .onAppear {
+            isAlwaysAllowed = aiProvider.consent.isAlwaysAllowed(destination)
+        }
 
         SecureField("API Key", text: $draftKey)
             .textContentType(.password)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .onChange(of: draftKey) {
+                errorMessage = nil
+            }
 
         Button("Save", action: save)
             .disabled(draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -62,6 +70,8 @@ struct CloudKeyRow: View {
     private func remove() {
         do {
             try aiProvider.removeKey(for: vendor)
+            aiProvider.consent.setAlwaysAllowed(false, for: .vendor(vendor))
+            isAlwaysAllowed = false
             draftKey = ""
             errorMessage = nil
         } catch {
@@ -71,8 +81,11 @@ struct CloudKeyRow: View {
 
     private func alwaysAllowed(for destination: ConsentDestination) -> Binding<Bool> {
         Binding(
-            get: { aiProvider.consent.isAlwaysAllowed(destination) },
-            set: { aiProvider.consent.setAlwaysAllowed($0, for: destination) }
+            get: { isAlwaysAllowed },
+            set: { newValue in
+                aiProvider.consent.setAlwaysAllowed(newValue, for: destination)
+                isAlwaysAllowed = newValue
+            }
         )
     }
 }
