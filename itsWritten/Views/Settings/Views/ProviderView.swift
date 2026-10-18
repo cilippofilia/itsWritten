@@ -18,7 +18,7 @@ struct ProviderView: View {
                 Label("Apple Intelligence", systemImage: "apple.intelligence")
                     .symbolRenderingMode(.multicolor)
             } footer: {
-                Text("Apple Intelligence runs entirely on your device, keeping your writing private and available even without an internet connection.")
+                Text("Apple Intelligence runs on your device by default. If it can't answer and you've added your own API key, itsWritten asks before sending anything to a cloud model.")
             }
 
             let currentLanguage = Locale.current.language
@@ -46,6 +46,8 @@ struct ProviderView: View {
             } header: {
                 Text("Language Support")
             }
+
+            CloudKeysSection()
 
             Section("Supported Languages") {
                 ForEach(

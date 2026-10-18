@@ -29,6 +29,7 @@ struct ToolsView: View {
             ForEach(tools) { tool in
                 Text(tool.summary)
             }
+            Text("Tools need Apple Intelligence. Cloud models answer without them.")
         }
     }
 }

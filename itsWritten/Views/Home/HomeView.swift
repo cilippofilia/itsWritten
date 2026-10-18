@@ -65,6 +65,7 @@ struct HomeView: View {
             }
         }
         .environment(conversationViewModel)
+        .cloudConsentAlert(aiProvider.consent)
         // A PrivateAds cross-promo ad every 3rd new chat started (see `CrossPromoSignal`,
         // bumped from `ConversationViewModel.persistCurrentTurn` when a brand-new thread is
         // first saved). The interstitial waits for the user to return to the composer
