@@ -19,7 +19,7 @@ extension View {
             .frame(maxWidth: .infinity)
     }
 
-    /// Presents the "Why AI?" explanation as a resizable sheet.
+    /// Presents the "Why AI?" explanation as a sheet.
     @available(iOS 26.0, *)
     func whyAISheet(isPresented: Binding<Bool>) -> some View {
         sheet(isPresented: isPresented) {
@@ -32,7 +32,7 @@ extension View {
     func whyAIPresentation() -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.ultraThinMaterial)
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
     }
 }
