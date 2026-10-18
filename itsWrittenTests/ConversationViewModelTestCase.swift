@@ -45,7 +45,8 @@ class ConversationViewModelTestCase: XCTestCase {
         let consent = CloudConsentCoordinator(defaults: UserDefaults(suiteName: UUID().uuidString)!)
         let orchestrator = AIOrchestrator(
             providers: providers,
-            privacyDisclosure: .askOnPrivacyChange { await consent.request($0) }
+            privacyDisclosure: .askOnPrivacyChange { await consent.request($0) },
+            outboundFilter: consent.outboundFilter
         )
         if let alwaysAllowed {
             consent.setAlwaysAllowed(true, for: alwaysAllowed)

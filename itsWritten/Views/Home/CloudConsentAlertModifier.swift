@@ -5,7 +5,8 @@
 
 import SwiftUI
 
-/// Presents the coordinator's pending cloud-consent prompt as an alert.
+/// Presents the coordinator's pending cloud-consent prompt: an alert for Apple
+/// Private Cloud Compute, the review sheet for third-party vendors.
 ///
 /// Every answer goes through `respond(to:allow:)` with the id of the request the alert
 /// was presented for, so a stale alert can never answer a newer prompt.
@@ -33,8 +34,13 @@ private struct CloudConsentAlertHost: View {
 
     var body: some View {
         Color.clear
+            .sheet(item: reviewedRequest) { request in
+                if let review = request.review {
+                    RedactionReviewSheet(request: request, review: review, coordinator: coordinator)
+                }
+            }
             .alert(
-                request.map { "Send to \($0.destination.displayName)?" } ?? "",
+                request.map { CloudConsentMessage.title(for: $0.destination) } ?? "",
                 isPresented: isPresented,
                 presenting: request
             ) { request in
@@ -49,11 +55,32 @@ private struct CloudConsentAlertHost: View {
             }
     }
 
+    /// The shown request while it is a vendor review. Swiping the sheet away
+    /// counts as a denial of this host's own request.
+    private var reviewedRequest: Binding<ConsentRequest?> {
+        let presentedID = request?.id
+        return Binding(
+            get: {
+                guard let pending = coordinator.pendingRequest, pending.id == presentedID, pending.review != nil else {
+                    return nil
+                }
+                return pending
+            },
+            set: { newValue in
+                guard newValue == nil, let presentedID else { return }
+                coordinator.respond(to: presentedID, allow: false)
+            }
+        )
+    }
+
     /// A dismissal without a button counts as a denial of this host's own request.
     private var isPresented: Binding<Bool> {
         let presentedID = request?.id
         return Binding(
-            get: { coordinator.pendingRequest != nil && coordinator.pendingRequest?.id == presentedID },
+            get: {
+                coordinator.pendingRequest != nil && coordinator.pendingRequest?.id == presentedID
+                    && coordinator.pendingRequest?.review == nil
+            },
             set: { newValue in
                 guard !newValue, let presentedID else { return }
                 coordinator.respond(to: presentedID, allow: false)

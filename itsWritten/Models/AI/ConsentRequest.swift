@@ -10,4 +10,7 @@ import Foundation
 struct ConsentRequest: Identifiable, Equatable {
     let id: UUID
     let destination: ConsentDestination
+    /// For third-party vendors, the message as it will be sent, with its hidden
+    /// details. `nil` for Apple Private Cloud Compute, which gets the plain alert.
+    var review: RedactionReview?
 }

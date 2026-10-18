@@ -7,11 +7,19 @@ import Foundation
 import Observation
 import VoltaSDK
 
-/// Bridges Volta's `.askOnPrivacyChange` handler to a SwiftUI alert.
+/// Bridges Volta's privacy hooks to the consent UI, and hides personal details
+/// from third-party vendors.
 ///
-/// A model call that would leave the device suspends in `request(_:)` until
-/// the user answers the prompt published in `pendingRequest`. Nothing is
-/// sent anywhere without a "yes".
+/// Two entry points, one per Volta hook:
+/// - `request(_:)`, the `.askOnPrivacyChange` handler, asks about Apple Private
+///   Cloud Compute (plain alert). It lets vendor downgrades through, because
+///   vendor consent needs the text of the call.
+/// - `review(_:)`, the outbound filter, runs right before any provider is
+///   called. For a vendor it redacts the call with the conversation's
+///   `RedactionSession` and, when the vendor isn't allowed yet or the call holds
+///   details the user hasn't reviewed, asks with the review sheet.
+///
+/// Nothing reaches a vendor without a "yes", and nothing reaches it unredacted.
 ///
 /// Bookkeeping: every suspended call is a `CheckedContinuation`, tagged with a
 /// token, that lives in exactly one place: either `currentWaiters` (the prompt
@@ -22,10 +30,20 @@ import VoltaSDK
 @MainActor
 @Observable
 final class CloudConsentCoordinator {
-    /// One suspended `request(_:)` call. The token lets cancellation find it.
+    /// How a waiting call was answered.
+    private enum Answer {
+        case denied
+        /// Allowed. Carries the redacted call for a vendor review; `nil` for a
+        /// plain consent ask.
+        case allowed(OutboundCall?)
+    }
+
+    /// One suspended call. The token lets cancellation find it.
     private struct Waiter {
         let token: UUID
-        let continuation: CheckedContinuation<Bool, Never>
+        /// The call to review, for a vendor; `nil` for a plain consent ask.
+        let call: OutboundCall?
+        let continuation: CheckedContinuation<Answer, Never>
     }
 
     /// A destination waiting for its turn, with every call asking for it.
@@ -39,22 +57,37 @@ final class CloudConsentCoordinator {
 
     /// Calls waiting on `pendingRequest`.
     @ObservationIgnored private var currentWaiters: [Waiter] = []
+    /// The call the shown review sheet describes.
+    @ObservationIgnored private var shownCall: OutboundCall?
     /// Prompts for other destinations, in arrival order.
     @ObservationIgnored private var queue: [QueuedPrompt] = []
     /// Destinations the user allowed during this conversation.
     @ObservationIgnored private var conversationGrants: Set<ConsentDestination> = []
+    /// This conversation's personal details and their placeholders.
+    @ObservationIgnored private(set) var redaction = RedactionSession()
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    /// Asks whether the downgrade may go ahead.
+    /// The Volta outbound filter that sends every call through `review(_:)`.
+    var outboundFilter: OutboundFilter {
+        { [weak self] call in
+            guard let self else { return nil }
+            return await self.review(call)
+        }
+    }
+
+    // MARK: - Volta hooks
+
+    /// Asks whether a privacy downgrade may go ahead.
     ///
     /// Returns `false` without prompting for destinations the app cannot
-    /// describe, and `true` without prompting when the destination is always
-    /// allowed or was allowed earlier in this conversation. Otherwise waits
-    /// for the user's answer. If the calling task is cancelled, before or
+    /// describe. Returns `true` without prompting for a vendor (`review(_:)`
+    /// asks, with the text in front of the user), and for a destination that is
+    /// always allowed or was allowed earlier in this conversation. Otherwise
+    /// waits for the user's answer. If the calling task is cancelled, before or
     /// while waiting, returns `false`, even for a destination that is allowed:
     /// a superseded call must never ride on a later conversation's grant.
     func request(_ downgrade: PrivacyDowngrade) async -> Bool {
@@ -62,30 +95,51 @@ final class CloudConsentCoordinator {
         guard let destination = ConsentDestination(provider: downgrade.provider, privacyLevel: downgrade.to) else {
             return false
         }
+        if case .vendor = destination {
+            return true
+        }
         if isAllowedWithoutPrompt(destination) {
             return true
         }
-        let token = UUID()
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                // Cancelled before we could enqueue: the handler below has
-                // nothing to find, so answer here.
-                guard !Task.isCancelled else {
-                    continuation.resume(returning: false)
-                    return
-                }
-                enqueue(Waiter(token: token, continuation: continuation), for: destination)
-            }
-        } onCancel: {
-            Task { @MainActor in
-                self.cancelWaiter(token)
-            }
-        }
+        guard case .allowed = await wait(for: destination, call: nil) else { return false }
+        return true
     }
 
+    /// The call a provider should receive, or `nil` to skip the provider.
+    ///
+    /// On-device and Private Cloud Compute calls pass unchanged (PCC consent was
+    /// asked by `request(_:)`). A call to an external provider the app can't
+    /// describe is blocked. A vendor call is redacted; it goes out without a
+    /// prompt only when the vendor is allowed and every detail in it was
+    /// reviewed. Cancellation before or while waiting returns `nil`.
+    func review(_ call: OutboundCall) async -> OutboundCall? {
+        guard !Task.isCancelled else { return nil }
+        switch call.privacyLevel {
+        case .onDevice, .appleCloud:
+            return call
+        case .external:
+            break
+        }
+        guard let destination = ConsentDestination(provider: call.provider, privacyLevel: call.privacyLevel),
+              case .vendor = destination else {
+            return nil
+        }
+        if let ready = readyCall(for: call, to: destination) {
+            return ready
+        }
+        guard case .allowed(let redacted) = await wait(for: destination, call: call) else { return nil }
+        return redacted
+    }
+
+    // MARK: - Answers
+
     /// Answers the prompt with the given id. Every call waiting on it gets
-    /// `allow`. A "yes" is remembered for the rest of the conversation; a
-    /// "no" is not.
+    /// `allow`. A "yes" is remembered for the rest of the conversation, and the
+    /// details in a review count as reviewed; a "no" is not remembered, and the
+    /// details found for it are forgotten.
+    ///
+    /// After a "yes", each waiting vendor call is checked again and only asks
+    /// once more if it holds details still unreviewed.
     ///
     /// Does nothing unless `requestID` is the prompt currently shown, so a
     /// duplicate or stale answer can never answer a prompt the user has not
@@ -94,27 +148,67 @@ final class CloudConsentCoordinator {
         guard let request = pendingRequest, request.id == requestID else { return }
         let waiters = currentWaiters
         currentWaiters = []
+        shownCall = nil
         pendingRequest = nil
         if allow {
             conversationGrants.insert(request.destination)
-        }
-        for waiter in waiters {
-            waiter.continuation.resume(returning: allow)
+            redaction.markAllReviewed()
+            for waiter in waiters {
+                guard let call = waiter.call else {
+                    waiter.continuation.resume(returning: .allowed(nil))
+                    continue
+                }
+                if let ready = readyCall(for: call, to: request.destination) {
+                    waiter.continuation.resume(returning: .allowed(ready))
+                } else {
+                    enqueue(waiter, for: request.destination)
+                }
+            }
+        } else {
+            redaction.discardUnreviewed()
+            for waiter in waiters {
+                waiter.continuation.resume(returning: .denied)
+            }
         }
         showNextPrompt()
     }
 
-    /// Forgets this conversation's grants and declines every waiting call.
+    /// Switches a detail in the shown review between hidden and sent as is.
+    func toggleReveal(_ entityID: RedactedEntity.ID, in requestID: ConsentRequest.ID) {
+        guard let request = pendingRequest, request.id == requestID, let shownCall else { return }
+        redaction.toggleReveal(entityID)
+        pendingRequest?.review = redaction.review(of: shownCall)
+    }
+
+    /// Forgets this conversation's grants and details, and declines every
+    /// waiting call.
     func resetConversationGrants() {
         conversationGrants.removeAll()
+        redaction = RedactionSession()
         let waiters = currentWaiters + queue.flatMap(\.waiters)
         currentWaiters = []
+        shownCall = nil
         queue = []
         pendingRequest = nil
         for waiter in waiters {
-            waiter.continuation.resume(returning: false)
+            waiter.continuation.resume(returning: .denied)
         }
     }
+
+    // MARK: - Restoring replies
+
+    /// A vendor's reply with the real words put back.
+    func restore(_ text: String) -> String {
+        redaction.restore(text)
+    }
+
+    /// A vendor's reply that is still streaming, with the real words put back
+    /// and any half-arrived placeholder held back.
+    func restoreForDisplay(_ partial: String) -> String {
+        redaction.restoreForDisplay(partial)
+    }
+
+    // MARK: - Always allow
 
     /// Whether the user chose to always allow this destination.
     func isAlwaysAllowed(_ destination: ConsentDestination) -> Bool {
@@ -130,6 +224,38 @@ final class CloudConsentCoordinator {
 
     private func isAllowedWithoutPrompt(_ destination: ConsentDestination) -> Bool {
         isAlwaysAllowed(destination) || conversationGrants.contains(destination)
+    }
+
+    /// The redacted call, when it can go out without asking: the vendor is
+    /// allowed and every detail in the call was reviewed. Leaves the session
+    /// untouched otherwise.
+    private func readyCall(for call: OutboundCall, to destination: ConsentDestination) -> OutboundCall? {
+        guard isAllowedWithoutPrompt(destination) else { return nil }
+        var draft = redaction
+        let redacted = draft.redact(call)
+        guard draft.hasUnreviewed(in: redacted.entityIDs) == false else { return nil }
+        redaction = draft
+        return redacted.call
+    }
+
+    /// Suspends until the prompt for `destination` is answered.
+    private func wait(for destination: ConsentDestination, call: OutboundCall?) async -> Answer {
+        let token = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                // Cancelled before we could enqueue: the handler below has
+                // nothing to find, so answer here.
+                guard !Task.isCancelled else {
+                    continuation.resume(returning: .denied)
+                    return
+                }
+                enqueue(Waiter(token: token, call: call, continuation: continuation), for: destination)
+            }
+        } onCancel: {
+            Task { @MainActor in
+                self.cancelWaiter(token)
+            }
+        }
     }
 
     /// Adds a waiter to the prompt for its destination, creating one if needed.
@@ -154,9 +280,11 @@ final class CloudConsentCoordinator {
             if currentWaiters.isEmpty {
                 // Nobody is waiting on the shown prompt any more.
                 pendingRequest = nil
+                shownCall = nil
+                redaction.discardUnreviewed()
                 showNextPrompt()
             }
-            waiter.continuation.resume(returning: false)
+            waiter.continuation.resume(returning: .denied)
             return
         }
         for queueIndex in queue.indices {
@@ -165,25 +293,37 @@ final class CloudConsentCoordinator {
             if queue[queueIndex].waiters.isEmpty {
                 queue.remove(at: queueIndex)
             }
-            waiter.continuation.resume(returning: false)
+            waiter.continuation.resume(returning: .denied)
             return
         }
     }
 
-    /// Publishes the next queued prompt. Destinations that became allowed
-    /// while they waited are resolved with `true` without prompting.
+    /// Publishes the next queued prompt. Calls that became ready while they
+    /// waited (allowed, nothing new to review) are answered without prompting.
     private func showNextPrompt() {
         guard pendingRequest == nil else { return }
         while !queue.isEmpty {
             let next = queue.removeFirst()
-            if isAllowedWithoutPrompt(next.destination) {
-                for waiter in next.waiters {
-                    waiter.continuation.resume(returning: true)
+            let waiting = next.waiters.filter { waiter in
+                if let call = waiter.call {
+                    guard let ready = readyCall(for: call, to: next.destination) else { return true }
+                    waiter.continuation.resume(returning: .allowed(ready))
+                    return false
                 }
-                continue
+                guard isAllowedWithoutPrompt(next.destination) else { return true }
+                waiter.continuation.resume(returning: .allowed(nil))
+                return false
             }
-            currentWaiters = next.waiters
-            pendingRequest = ConsentRequest(id: UUID(), destination: next.destination)
+            guard let first = waiting.first else { continue }
+            currentWaiters = waiting
+            var review: RedactionReview?
+            if let call = first.call {
+                // Registers the call's new details, so the sheet can show them.
+                _ = redaction.redact(call)
+                shownCall = call
+                review = redaction.review(of: call)
+            }
+            pendingRequest = ConsentRequest(id: UUID(), destination: next.destination, review: review)
             return
         }
     }

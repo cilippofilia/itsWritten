@@ -37,6 +37,20 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         provider: .privateCloudCompute
     )
 
+    /// A vendor call with no personal details: reviewing it is a plain consent ask.
+    private let claudeCall = OutboundCall(
+        prompt: "hello",
+        instructions: nil,
+        history: [],
+        provider: .userAccount(.anthropic),
+        privacyLevel: .external
+    )
+
+    /// Vendor consent goes through the outbound filter: `true` when the call may go out.
+    private func askClaude(_ coordinator: CloudConsentCoordinator) async -> Bool {
+        await coordinator.review(claudeCall) != nil
+    }
+
     /// Yields until the coordinator publishes a pending request, or gives up after a bounded number of yields.
     private func waitForPending(_ coordinator: CloudConsentCoordinator) async {
         for _ in 0..<1_000 where coordinator.pendingRequest == nil {
@@ -67,7 +81,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testRequestPublishesPendingAndResolves() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let task = Task { await coordinator.request(claudeDowngrade) }
+        let task = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         XCTAssertEqual(coordinator.pendingRequest?.destination, .vendor(.anthropic))
 
@@ -79,19 +93,19 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testGrantIsRememberedForConversation() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let task = Task { await coordinator.request(claudeDowngrade) }
+        let task = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         _ = await task.value
 
-        let second = await coordinator.request(claudeDowngrade)
+        let second = await askClaude(coordinator)
         XCTAssertTrue(second)
         XCTAssertNil(coordinator.pendingRequest)
     }
 
     func testDeclineIsNotRemembered() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let first = Task { await coordinator.request(claudeDowngrade) }
+        let first = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let firstID = coordinator.pendingRequest?.id
         try answerShown(coordinator, allow: false)
@@ -99,7 +113,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         XCTAssertFalse(firstResult)
         XCTAssertNil(coordinator.pendingRequest)
 
-        let second = Task { await coordinator.request(claudeDowngrade) }
+        let second = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         XCTAssertEqual(coordinator.pendingRequest?.destination, .vendor(.anthropic))
         XCTAssertNotEqual(coordinator.pendingRequest?.id, firstID)
@@ -112,13 +126,13 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         coordinator.setAlwaysAllowed(true, for: .vendor(.anthropic))
         XCTAssertTrue(coordinator.isAlwaysAllowed(.vendor(.anthropic)))
 
-        let allowed = await coordinator.request(claudeDowngrade)
+        let allowed = await askClaude(coordinator)
         XCTAssertTrue(allowed)
         XCTAssertNil(coordinator.pendingRequest)
 
         let fresh = CloudConsentCoordinator(defaults: defaults)
         XCTAssertTrue(fresh.isAlwaysAllowed(.vendor(.anthropic)))
-        let freshAllowed = await fresh.request(claudeDowngrade)
+        let freshAllowed = await askClaude(fresh)
         XCTAssertTrue(freshAllowed)
         XCTAssertNil(fresh.pendingRequest)
 
@@ -128,7 +142,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testDestinationsAreSeparate() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         _ = await claude.value
@@ -143,10 +157,10 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testConcurrentRequestsForSameDestinationCoalesce() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let first = Task { await coordinator.request(claudeDowngrade) }
+        let first = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let pendingID = coordinator.pendingRequest?.id
-        let second = Task { await coordinator.request(claudeDowngrade) }
+        let second = Task { await self.askClaude(coordinator) }
         for _ in 0..<100 { await Task.yield() }
         XCTAssertEqual(coordinator.pendingRequest?.id, pendingID)
 
@@ -160,7 +174,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testDifferentDestinationWaitsForCurrentPrompt() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let apple = Task { await coordinator.request(appleCloudDowngrade) }
         for _ in 0..<100 { await Task.yield() }
@@ -179,7 +193,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testResetResolvesPendingWithFalse() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let apple = Task { await coordinator.request(appleCloudDowngrade) }
         for _ in 0..<100 { await Task.yield() }
@@ -191,7 +205,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         XCTAssertFalse(appleResult)
         XCTAssertNil(coordinator.pendingRequest)
 
-        let next = Task { await coordinator.request(claudeDowngrade) }
+        let next = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         XCTAssertEqual(coordinator.pendingRequest?.destination, .vendor(.anthropic))
         try answerShown(coordinator, allow: false)
@@ -200,13 +214,13 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testResetClearsGrants() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let first = Task { await coordinator.request(claudeDowngrade) }
+        let first = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         _ = await first.value
 
         coordinator.resetConversationGrants()
-        let second = Task { await coordinator.request(claudeDowngrade) }
+        let second = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         XCTAssertEqual(coordinator.pendingRequest?.destination, .vendor(.anthropic))
         try answerShown(coordinator, allow: false)
@@ -221,7 +235,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testStaleAnswerDoesNotAnswerNextPrompt() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let claudeID = try XCTUnwrap(coordinator.pendingRequest?.id)
 
@@ -253,7 +267,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testCancelledRequestResolvesFalseAndClearsPrompt() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         XCTAssertEqual(coordinator.pendingRequest?.destination, .vendor(.anthropic))
 
@@ -263,7 +277,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.pendingRequest)
 
         // A cancelled waiter for the shown prompt hands over to the next queued destination.
-        let first = Task { await coordinator.request(claudeDowngrade) }
+        let first = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         let apple = Task { await coordinator.request(appleCloudDowngrade) }
         for _ in 0..<100 { await Task.yield() }
@@ -274,7 +288,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.pendingRequest?.destination, .privateCloudCompute)
 
         // Cancelling a queued waiter resolves it without touching the shown prompt.
-        let queuedClaude = Task { await coordinator.request(claudeDowngrade) }
+        let queuedClaude = Task { await self.askClaude(coordinator) }
         for _ in 0..<100 { await Task.yield() }
         queuedClaude.cancel()
         let queuedResult = await queuedClaude.value
@@ -289,7 +303,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testCancellationAfterAnswerKeepsAnswer() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let claude = Task { await coordinator.request(claudeDowngrade) }
+        let claude = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         claude.cancel()
@@ -304,7 +318,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
         coordinator.setAlwaysAllowed(true, for: .vendor(.anthropic))
         let task = Task {
             try? await Task.sleep(for: .seconds(10))
-            return await coordinator.request(claudeDowngrade)
+            return await askClaude(coordinator)
         }
         task.cancel()
 
@@ -315,7 +329,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
     func testCancelledTaskIsDeclinedEvenWithConversationGrant() async throws {
         let coordinator = CloudConsentCoordinator(defaults: defaults)
-        let first = Task { await coordinator.request(claudeDowngrade) }
+        let first = Task { await self.askClaude(coordinator) }
         await waitForPending(coordinator)
         try answerShown(coordinator, allow: true)
         let firstAllowed = await first.value
@@ -323,7 +337,7 @@ final class CloudConsentCoordinatorTests: XCTestCase {
 
         let task = Task {
             try? await Task.sleep(for: .seconds(10))
-            return await coordinator.request(claudeDowngrade)
+            return await askClaude(coordinator)
         }
         task.cancel()
 

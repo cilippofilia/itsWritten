@@ -101,6 +101,9 @@ final class AIProviderStore {
             keys[vendor].map { UserAccount(vendor: vendor, apiKey: $0) }
         }
         configuration.privacyDisclosure = .askOnPrivacyChange { await consent.request($0) }
+        // Vendor consent and redaction happen here, not in the disclosure above:
+        // `request(_:)` lets vendor downgrades through because it can't see the text.
+        configuration.outboundFilter = consent.outboundFilter
         return configuration
     }
 

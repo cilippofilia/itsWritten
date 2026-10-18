@@ -141,3 +141,7 @@ the safe direction.
   LLMs) are out of scope.
 - `NLTagger` name recognition is best in English; other languages fall back
   to the pattern-based kinds.
+- The iOS Simulator ships without the name-recognition model
+  (`availableTagSchemes` lacks `.nameType`), so names, places and
+  organizations are only detected on real devices; the tests that need it
+  skip in the simulator.
