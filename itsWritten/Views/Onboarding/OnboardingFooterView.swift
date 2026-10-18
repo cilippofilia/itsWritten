@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct OnboardingFooterView: View {
     let canGoBack: Bool
     let isLastStep: Bool
@@ -55,6 +56,7 @@ struct OnboardingFooterView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     OnboardingFooterView(
         canGoBack: true,

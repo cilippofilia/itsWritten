@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ComposingView: View {
     @Environment(HomeViewModel.self) private var homeViewModel
     @Environment(CountdownViewModel.self) private var countDownViewModel
@@ -50,6 +51,7 @@ struct ComposingView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     struct PreviewWrapper: View {
         @State private var text = ""

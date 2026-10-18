@@ -91,7 +91,9 @@ final class AIProviderStore {
     ) -> AIConfiguration {
         var configuration = AIConfiguration()
         configuration.enableOnDevice = true
-        configuration.onDeviceModel = AppLanguageModel.model
+        if #available(iOS 26.0, *) {
+            configuration.onDeviceModel = AppLanguageModel.model
+        }
         configuration.enablePrivateCloudCompute = true
         configuration.preference = .preferOnDevice
         configuration.developerKey = nil

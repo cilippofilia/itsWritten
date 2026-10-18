@@ -11,6 +11,7 @@ import SwiftUI
 ///
 /// User messages appear with a blue background aligned to the trailing edge,
 /// while AI responses appear with a gray background aligned to the leading edge.
+@available(iOS 26.0, *)
 struct MessageBubble: View {
     @State private var discloseToolsUsed: Bool = false
 
@@ -80,16 +81,20 @@ struct MessageBubble: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview("User message - Light") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: true))
 }
+@available(iOS 26.0, *)
 #Preview("AI response - Light") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: false))
 }
+@available(iOS 26.0, *)
 #Preview("User message - Dark") {
     MessageBubble(message: ChatMessage(content: "This is my message as a response to the previous one.", isUser: true))
         .preferredColorScheme(.dark)
 }
+@available(iOS 26.0, *)
 #Preview("AI response - Dark") {
     MessageBubble(
         message: ChatMessage(
@@ -108,6 +113,7 @@ struct MessageBubble: View {
         .preferredColorScheme(.dark)
 }
 
+@available(iOS 26.0, *)
 private struct ToolSourceRow: View {
     let source: ChatMessageSource
 

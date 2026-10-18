@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ToolsView: View {
     private struct ToolInfo: Identifiable {
         let id: String
@@ -34,6 +35,7 @@ struct ToolsView: View {
     }
 }
 
+@available(iOS 26.0, *)
 private extension String {
     /// Converts a snake_case tool name into a human-readable title,
     /// handling known acronyms such as "pubmed" → "PubMed".
@@ -52,6 +54,7 @@ private extension String {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     Form {
         ToolsView()

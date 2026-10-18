@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct TimerMenuButtonView: View {
     @Environment(CountdownViewModel.self) var viewModel
 
@@ -88,6 +89,7 @@ struct TimerMenuButtonView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     TimerMenuButtonView()
         .environment(CountdownViewModel())

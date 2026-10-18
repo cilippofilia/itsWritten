@@ -6,6 +6,7 @@
 import SwiftUI
 
 /// Lets users without Apple Intelligence add their own cloud API key.
+@available(iOS 26.0, *)
 struct CloudFallbackButton: View {
     @State private var showCloudKeys = false
 
@@ -20,6 +21,7 @@ struct CloudFallbackButton: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     CloudFallbackButton()
         .environment(AIProviderStore())

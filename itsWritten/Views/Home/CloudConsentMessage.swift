@@ -5,6 +5,7 @@
 
 /// Copy for the cloud-consent alert. A "Send" covers the rest of the current
 /// conversation, so both variants say so.
+@available(iOS 26.0, *)
 enum CloudConsentMessage {
     /// The alert message for `destination`.
     static func text(for destination: ConsentDestination) -> String {

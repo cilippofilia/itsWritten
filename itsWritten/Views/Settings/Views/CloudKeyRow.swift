@@ -7,6 +7,7 @@ import SwiftUI
 import VoltaSDK
 
 /// Key entry for a single cloud vendor.
+@available(iOS 26.0, *)
 struct CloudKeyRow: View {
     let vendor: CloudVendor
 
@@ -92,6 +93,7 @@ struct CloudKeyRow: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     Form {
         CloudKeyRow(vendor: .openAI)

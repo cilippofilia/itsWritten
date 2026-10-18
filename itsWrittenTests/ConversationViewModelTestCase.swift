@@ -12,6 +12,7 @@ import XCTest
 
 /// Shared setup for view model tests that drive mock providers through a real
 /// `AIOrchestrator` and an in-memory SwiftData store.
+@available(iOS 26.0, *)
 @MainActor
 class ConversationViewModelTestCase: XCTestCase {
 

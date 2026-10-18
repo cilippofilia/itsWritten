@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct HomeTextEditor: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
@@ -36,6 +37,7 @@ struct HomeTextEditor: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     struct PreviewWrapper: View {
         @State private var text: String = "TEST"

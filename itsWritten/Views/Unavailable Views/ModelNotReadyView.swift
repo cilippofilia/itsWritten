@@ -8,6 +8,7 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ModelNotReadyView: View {
     @State private var retryCountdown: Int = 5
 
@@ -55,6 +56,7 @@ struct ModelNotReadyView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     ModelNotReadyView(action: { })
         .environment(AIProviderStore())

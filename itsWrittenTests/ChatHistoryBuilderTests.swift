@@ -2,6 +2,7 @@ import XCTest
 import VoltaSDK
 @testable import itsWritten
 
+@available(iOS 26.0, *)
 final class ChatHistoryBuilderTests: XCTestCase {
     private func user(_ text: String) -> ChatMessage { ChatMessage(content: text, isUser: true) }
     private func assistant(_ text: String) -> ChatMessage { ChatMessage(content: text, isUser: false) }

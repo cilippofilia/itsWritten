@@ -6,6 +6,7 @@
 import SwiftUI
 
 /// Onboarding or the home screen, shown whenever a model (on-device or cloud) can answer.
+@available(iOS 26.0, *)
 struct ReadyContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 

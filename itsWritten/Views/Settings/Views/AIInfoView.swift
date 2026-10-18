@@ -8,6 +8,7 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct AIInfoView: View {
     var model = AppLanguageModel.model
     @Environment(\.openURL) private var openURL
@@ -79,6 +80,7 @@ struct AIInfoView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         AIInfoView()

@@ -8,6 +8,7 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct AvailabilityView: View {
     @Environment(AIProviderStore.self) private var aiProvider
     @State private var homeVM = HomeViewModel()
@@ -54,6 +55,7 @@ struct AvailabilityView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     AvailabilityView()
         .environment(AIProviderStore())

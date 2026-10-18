@@ -9,6 +9,7 @@ import FoundationModels
 import SwiftUI
 import SwiftData
 
+@available(iOS 26.0, *)
 struct ChatHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -97,6 +98,7 @@ struct ChatHistoryView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         ChatHistoryView(

@@ -8,6 +8,7 @@
 import XCTest
 @testable import itsWritten
 
+@available(iOS 26.0, *)
 final class ChatModelTests: XCTestCase {
     func testCodableRoundTrip() throws {
         let id = UUID(uuidString: "A8A6D8B1-75D6-4F9F-8A2A-2168C1F1E5F1")!

@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct MenuButtonView: View {
     @Binding var showWhyAISheet: Bool
     @Binding var showChatHistoryView: Bool
@@ -31,6 +32,7 @@ struct MenuButtonView: View {
     }
 }
 
+@available(iOS 26.0, *)
 private extension MenuButtonView {
     var whyAIButton: some View {
         Button(action: {
@@ -60,6 +62,7 @@ private extension MenuButtonView {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     MenuButtonView(
         showWhyAISheet: .constant(false),

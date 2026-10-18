@@ -8,6 +8,7 @@
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ProviderView: View {
     var model = AppLanguageModel.model
     @Environment(\.openURL) private var openURL

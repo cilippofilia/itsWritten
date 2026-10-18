@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ChatBubbleModifier: ViewModifier {
     let alignment: HorizontalAlignment
     let backgroundColor: AnyShapeStyle
@@ -27,6 +28,7 @@ struct ChatBubbleModifier: ViewModifier {
     }
 }
 
+@available(iOS 26.0, *)
 extension View {
     func chatBubble(
         alignment: HorizontalAlignment = .leading,

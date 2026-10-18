@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct SendButtonView: View {
     let isResponding: Bool
     let isInputEmpty: Bool
@@ -45,6 +46,7 @@ struct SendButtonView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     SendButtonView(isResponding: true, isInputEmpty: true, sendAction: { })
 }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct ChatHistoryRowView: View {
     let thread: ChatThread
 
@@ -48,6 +49,7 @@ struct ChatHistoryRowView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     ChatHistoryRowView(thread: .sampleThreads.first!)
 }

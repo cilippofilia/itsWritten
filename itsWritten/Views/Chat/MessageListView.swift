@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct MessageListView: View {
     let messages: [ChatMessage]
     let isResponding: Bool
@@ -69,6 +70,7 @@ struct MessageListView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     MessageListView(messages: [], isResponding: false)
 }

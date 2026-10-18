@@ -9,6 +9,7 @@ import Foundation
 import FoundationModels
 import SwiftUI
 
+@available(iOS 26.0, *)
 enum SheetType: Identifiable, Equatable {
     case whyAI
     case settings(Binding<ModelConfiguration>, Binding<ModelResponseType>)

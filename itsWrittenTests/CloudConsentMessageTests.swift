@@ -7,6 +7,7 @@ import VoltaSDK
 import XCTest
 @testable import itsWritten
 
+@available(iOS 26.0, *)
 final class CloudConsentMessageTests: XCTestCase {
     func testVendorMessageNamesVendorAndScopesToConversation() {
         XCTAssertEqual(

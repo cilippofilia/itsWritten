@@ -8,6 +8,7 @@ import VoltaSDK
 @testable import itsWritten
 
 /// Dictionary-backed key store for tests.
+@available(iOS 26.0, *)
 final class InMemoryAPIKeyStore: APIKeyStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var keys: [CloudVendor: String]

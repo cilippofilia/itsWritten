@@ -7,6 +7,7 @@ import SwiftUI
 import VoltaSDK
 
 /// Settings section where users add their own cloud API keys.
+@available(iOS 26.0, *)
 struct CloudKeysSection: View {
     var body: some View {
         ForEach(CloudVendor.allCases, id: \.self) { vendor in
@@ -25,6 +26,7 @@ struct CloudKeysSection: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     Form {
         CloudKeysSection()

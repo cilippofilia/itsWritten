@@ -9,6 +9,7 @@ import VoltaSDK
 /// On-device provider whose availability check waits until the test opens its gate,
 /// then reports unavailable so the chain moves on. The wait ignores cancellation, so
 /// a test can change state while a call is parked here.
+@available(iOS 26.0, *)
 struct GatedProvider: ModelProvider {
     /// Shared open/entered flags.
     final class Gate: Sendable {

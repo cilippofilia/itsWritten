@@ -7,6 +7,7 @@ import VoltaSDK
 import XCTest
 @testable import itsWritten
 
+@available(iOS 26.0, *)
 @MainActor
 final class CloudConsentCoordinatorTests: XCTestCase {
     /// Records whether a request has resolved, readable from the test body.

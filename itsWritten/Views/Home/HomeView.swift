@@ -10,6 +10,7 @@ import PrivateAds
 import SwiftData
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct HomeView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
@@ -128,6 +129,7 @@ struct HomeView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     HomeView()
         .environment(HomeViewModel())

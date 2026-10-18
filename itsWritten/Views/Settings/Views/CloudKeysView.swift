@@ -6,6 +6,7 @@
 import SwiftUI
 
 /// Standalone screen for managing cloud API keys.
+@available(iOS 26.0, *)
 struct CloudKeysView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -26,6 +27,7 @@ struct CloudKeysView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     CloudKeysView()
         .environment(AIProviderStore())

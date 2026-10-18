@@ -6,6 +6,7 @@
 import VoltaSDK
 
 /// On-device plain provider that returns `outcomes` in order, repeating the last one.
+@available(iOS 26.0, *)
 struct SequencedProvider: ModelProvider {
     let identifier = ProviderIdentifier.onDevice
     let privacyLevel = PrivacyLevel.onDevice

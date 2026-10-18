@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@available(iOS 26.0, *)
 struct WhyAIView: View {
     let analogy: String = """
 
@@ -44,6 +45,7 @@ struct WhyAIView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     WhyAIView()
 }
