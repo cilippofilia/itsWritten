@@ -13,7 +13,8 @@ struct OnboardingView: View {
 
     @State private var visibleCount = 1
 
-    private let steps: [OnboardingStep] = [
+    /// Static so each step's `id` stays stable when SwiftUI rebuilds this view.
+    private static let steps: [OnboardingStep] = [
         .init(
             title: "Welcome to itsWritten",
             detail: "A quiet space to capture your day and notice gentle patterns in your thoughts.",
@@ -44,35 +45,27 @@ struct OnboardingView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack {
-                    ForEach(steps.prefix(visibleCount)) { step in
+                    ForEach(Self.steps.prefix(visibleCount)) { step in
                         OnboardingStepView(step: step)
                             .id(step.id)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .readableContentWidth()
 
                 Spacer(minLength: 100)
             }
             .navigationTitle("itsWritten")
         }
-        .onTapGesture {
-            advance()
-        }
         .safeAreaInset(edge: .bottom) {
             OnboardingFooterView(
                 canGoBack: visibleCount > 1,
-                isLastStep: visibleCount == steps.count,
+                isLastStep: visibleCount == Self.steps.count,
                 backAction: goBack,
-                primaryAction: {
-                    if visibleCount < steps.count {
-                        advance()
-                    } else {
-                        finish()
-                    }
-                },
+                primaryAction: primaryAction,
                 secondaryAction: skipToLast
             )
+            .readableContentWidth()
         }
     }
 
@@ -83,8 +76,16 @@ struct OnboardingView: View {
         }
     }
 
+    private func primaryAction() {
+        if visibleCount < Self.steps.count {
+            advance()
+        } else {
+            finish()
+        }
+    }
+
     private func advance() {
-        if visibleCount < steps.count {
+        if visibleCount < Self.steps.count {
             withAnimation(.easeInOut) {
                 visibleCount += 1
             }
@@ -93,7 +94,7 @@ struct OnboardingView: View {
 
     private func skipToLast() {
         withAnimation(.easeInOut) {
-            visibleCount = steps.count
+            visibleCount = Self.steps.count
         }
     }
 

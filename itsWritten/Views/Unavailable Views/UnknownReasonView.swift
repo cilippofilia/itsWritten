@@ -14,42 +14,40 @@ struct UnknownReasonView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.gray)
+            ScrollView {
+                VStack(spacing: 20) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.largeTitle.scaled(by: 1.8))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
 
-                Text("Unknown Status")
-                    .font(.title2)
-                    .bold()
+                    Text("Unknown Status")
+                        .font(.title2)
+                        .bold()
 
-                Text("An unexpected status was encountered. Please try restarting the app.")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    Text("An unexpected status was encountered. Please try restarting the app.")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-                CloudFallbackButton()
+                    CloudFallbackButton()
+                }
+                .padding()
+                .readableContentWidth()
             }
-            .padding()
+            .defaultScrollAnchor(.center, for: .alignment)
+            .scrollBounceBehavior(.basedOnSize)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    GlassEffectContainer {
-                        Button(action: {
-                            showWhyAISheet = true
-                        }) {
-                            Label("Why AI?", systemImage: "sparkles")
-                        }
-                    }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Why AI?", systemImage: "sparkles", action: presentWhyAI)
                 }
             }
-            .sheet(isPresented: $showWhyAISheet) {
-                WhyAIView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.ultraThinMaterial)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
+            .whyAISheet(isPresented: $showWhyAISheet)
         }
+    }
+
+    private func presentWhyAI() {
+        showWhyAISheet = true
     }
 }
 

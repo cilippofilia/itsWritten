@@ -11,6 +11,7 @@ import SwiftUI
 struct ChatConversationView: View {
     @Environment(ConversationViewModel.self) private var viewModel
     @Environment(HomeViewModel.self) private var homeViewModel
+    @Environment(NewChatTransition.self) private var newChatTransition
 
     @Binding var config: ModelConfiguration
     @Binding var responseType: ModelResponseType
@@ -22,6 +23,12 @@ struct ChatConversationView: View {
             messages: viewModel.messages,
             isResponding: viewModel.isResponding
         )
+        // The new-chat letter starts exactly where the messages are.
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            newChatTransition.sourceGlobalFrame = frame
+        }
         .safeAreaInset(edge: .bottom) {
             PromptInputView(
                 text: $input,
@@ -54,4 +61,5 @@ struct ChatConversationView: View {
     }
     .environment(ConversationViewModel())
     .environment(HomeViewModel())
+    .environment(NewChatTransition())
 }

@@ -17,40 +17,32 @@ struct OnboardingFooterView: View {
 
     var body: some View {
         HStack {
-            Button("Back", systemImage: "chevron.left") {
-                backAction()
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.glass)
-            .disabled(!canGoBack)
+            Button("Back", systemImage: "chevron.left", action: backAction)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+                .disabled(!canGoBack)
 
             Spacer()
 
-            Button("Skip") {
-                secondaryAction()
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.glass)
-            .foregroundStyle(.secondary)
-            .disabled(isLastStep)
+            Button("Skip", action: secondaryAction)
+                .buttonStyle(.glass)
+                .foregroundStyle(.secondary)
+                .disabled(isLastStep)
 
             Spacer()
 
             if isLastStep {
-                Button("Let's write!") {
-                    primaryAction()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
+                Button("Let's write!", action: primaryAction)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
             } else {
-                Button("", systemImage: "chevron.right") {
-                    primaryAction()
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glassProminent)
-                .tint(.blue)
+                Button("Next", systemImage: "chevron.right", action: primaryAction)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glassProminent)
+                    .tint(.blue)
             }
         }
+        .controlSize(.large)
         .frame(maxWidth: .infinity)
         .padding([.horizontal, .bottom])
     }

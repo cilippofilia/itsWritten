@@ -15,7 +15,7 @@ enum ContactOption: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
         case .reportBug: "Report a Bug"
         case .requestFeature: "Request a Feature"

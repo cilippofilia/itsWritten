@@ -5,30 +5,39 @@
 //  Created by Filippo Cilia on 28/01/2026.
 //
 
-import FoundationModels
-import SwiftUI
 import SwiftData
+import SwiftUI
 
+/// Saved conversations. Shown as the sidebar of `HomeView`'s split view: beside the
+/// conversation in wide windows, and as the screen behind it in narrow ones.
 @available(iOS 26.0, *)
 struct ChatHistoryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @Environment(ConversationViewModel.self) private var conversationViewModel
     @Query(sort: \ChatThread.lastUpdated, order: .reverse) private var chatThreads: [ChatThread]
 
-    @Binding var config: ModelConfiguration
-    @Binding var responseType: ModelResponseType
+    /// Called when the user picks a thread to resume.
+    let onSelect: (ChatThread) -> Void
+
     @State private var showingDeleteAllConfirmation = false
+    @State private var saveErrorMessage: String?
 
     var body: some View {
         Group {
             if chatThreads.isEmpty {
-                unavailableView
+                ContentUnavailableView {
+                    Label("No History", systemImage: "bubble.left.and.exclamationmark.bubble.right")
+                } description: {
+                    Text("You don't have any conversation history yet")
+                }
             } else {
-                availableView
-                    #if !DEBUG
-                    .hideSensitiveData()
-                    #endif
+                ChatHistoryListView(
+                    threads: chatThreads,
+                    onSelect: onSelect,
+                    onDelete: deleteThreads
+                )
+                #if !DEBUG
+                .hideSensitiveData()
+                #endif
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -36,56 +45,39 @@ struct ChatHistoryView: View {
         }
         .navigationTitle("History")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Delete All") {
-                    showingDeleteAllConfirmation = true
-                }
-                .disabled(chatThreads.isEmpty)
-                .confirmationDialog(
-                    "Delete all history?",
-                    isPresented: $showingDeleteAllConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete All", role: .destructive) {
-                        withAnimation(.easeInOut) {
-                            for thread in chatThreads {
-                                modelContext.delete(thread)
-                            }
-                            try? modelContext.save()
-                        }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Delete All", systemImage: "trash", role: .destructive, action: confirmDeleteAll)
+                    .disabled(chatThreads.isEmpty)
+                    .confirmationDialog(
+                        "Delete all history?",
+                        isPresented: $showingDeleteAllConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete All", role: .destructive, action: deleteAllThreads)
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This will permanently remove all saved conversations.")
                     }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This will permanently remove all saved conversations.")
-                }
             }
+        }
+        .alert("Couldn't Delete", item: $saveErrorMessage) { _ in
+            Button("OK") {}
+        } message: { message in
+            Text(message)
         }
     }
 
-    var unavailableView: some View {
-        ContentUnavailableView {
-            Label("No History", systemImage: "bubble.left.and.exclamationmark.bubble.right")
-        } description: {
-            Text("You don't have any conversation history yet")
-        }
+    private func confirmDeleteAll() {
+        showingDeleteAllConfirmation = true
     }
 
-    var availableView: some View {
-        List {
-            ForEach(chatThreads) { thread in
-                Button(action: {
-                    conversationViewModel.resume(thread: thread, config: config)
-                    dismiss()
-                }) {
-                    ChatHistoryRowView(thread: thread)
-                }
-                .listRowSeparator(.hidden)
-                .listRowInsets(.init(top: 4, leading: 8, bottom: 4, trailing: 8))
-                .listRowBackground(Color.clear)
+    private func deleteAllThreads() {
+        withAnimation(.easeInOut) {
+            for thread in chatThreads {
+                modelContext.delete(thread)
             }
-            .onDelete(perform: deleteThreads)
+            save()
         }
-        .listStyle(.plain)
     }
 
     private func deleteThreads(at offsets: IndexSet) {
@@ -93,7 +85,16 @@ struct ChatHistoryView: View {
             for index in offsets {
                 modelContext.delete(chatThreads[index])
             }
-            try? modelContext.save()
+            save()
+        }
+    }
+
+    private func save() {
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            saveErrorMessage = error.localizedDescription
         }
     }
 }
@@ -101,12 +102,8 @@ struct ChatHistoryView: View {
 @available(iOS 26.0, *)
 #Preview {
     NavigationStack {
-        ChatHistoryView(
-            config: .constant(ModelConfiguration()),
-            responseType: .constant(.standard)
-        )
+        ChatHistoryView(onSelect: { _ in })
     }
     .environment(RemoveAdsStore())
-    .environment(ConversationViewModel())
     .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }

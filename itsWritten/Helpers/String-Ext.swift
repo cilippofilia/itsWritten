@@ -17,4 +17,20 @@ extension String {
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    /// Converts a snake_case tool name into a human-readable title,
+    /// handling known acronyms such as "pubmed" → "PubMed".
+    var humanizedToolName: String {
+        let acronyms: [String: String] = [
+            "pubmed": "PubMed",
+            "clinicaltrials": "ClinicalTrials.gov",
+            "openfda": "OpenFDA"
+        ]
+        return split(separator: "_")
+            .map { word in
+                let lower = word.lowercased()
+                return acronyms[lower] ?? word.capitalized
+            }
+            .joined(separator: " ")
+    }
 }

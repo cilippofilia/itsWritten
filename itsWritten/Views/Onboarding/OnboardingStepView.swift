@@ -15,7 +15,8 @@ struct OnboardingStepView: View {
         VStack(alignment: .leading) {
             HStack(alignment: .center) {
                 Image(systemName: step.systemImage)
-                    .font(.system(.largeTitle))
+                    .font(.largeTitle)
+                    .accessibilityHidden(true)
                     .foregroundStyle(step.accent)
                     .symbolRenderingMode(.hierarchical)
 
@@ -24,7 +25,7 @@ struct OnboardingStepView: View {
                     .bold()
                     .foregroundStyle(.primary)
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, DesignConstants.Spacing.small)
 
             Text(step.detail)
                 .font(.body)
@@ -34,18 +35,14 @@ struct OnboardingStepView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .background {
-            GlassEffectContainer {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(step.accent.opacity(0.25))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(step.accent.opacity(0.25), lineWidth: 2)
-                    }
-            }
+            RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.panel)
+                .fill(step.accent.opacity(0.25))
+                .stroke(step.accent.opacity(0.25), lineWidth: 2)
         }
-        .clipShape(.rect(cornerRadius: 28))
+        .clipShape(.rect(cornerRadius: DesignConstants.CornerRadius.panel))
+        .accessibilityElement(children: .combine)
         .padding(.horizontal)
-        .padding(.top, 8)
+        .padding(.top, DesignConstants.Spacing.small)
     }
 }
 

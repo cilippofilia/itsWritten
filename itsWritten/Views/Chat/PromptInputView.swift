@@ -27,6 +27,7 @@ struct PromptInputView: View {
                 .onSubmit(onSubmit)
 
             Button("Send", systemImage: "arrow.up.circle.fill", action: onSubmit)
+                .keyboardShortcut(.return, modifiers: .command)
                 .imageScale(.large)
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .blue.gradient)
@@ -39,8 +40,8 @@ struct PromptInputView: View {
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .capsule)
         .padding(.horizontal)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .padding(.vertical, DesignConstants.Spacing.small)
+        .readableContentWidth()
     }
 }
 

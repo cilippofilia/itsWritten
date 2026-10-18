@@ -11,59 +11,69 @@ import SwiftUI
 struct DeviceNotSupportedView: View {
     @State private var showWhyAISheet: Bool = false
 
+    private let appleIntelligenceURL = URL(string: "https://www.apple.com/apple-intelligence/")
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.orange)
+            ScrollView {
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle.scaled(by: 1.8))
+                        .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
 
-                Text("Device Not Supported")
-                    .font(.title2)
-                    .bold()
+                    Text("Device Not Supported")
+                        .font(.title2)
+                        .bold()
 
-                Text("This device does not support Apple Intelligence. This feature requires a compatible device with an A17 Pro chip or later.")
+                    Text("""
+                    This device does not support Apple Intelligence. \
+                    This feature requires a compatible device with an A17 Pro chip or later.
+                    """)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
-                Text("Compatible devices include iPhone 15 Pro, iPhone 15 Pro Max, and later models.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    Text("Compatible devices include iPhone 15 Pro, iPhone 15 Pro Max, and later models.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-                HStack(spacing: 2) {
-                    Text("For more info:")
-                    Link("Apple Intelligence", destination: URL(string: "https://www.apple.com/apple-intelligence/")!)
-                        .bold()
-                        .underline(true, pattern: .solid, color: Color.secondary.opacity(0.2))
-                }
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                    if let appleIntelligenceURL {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 2) {
+                                Text("For more info:")
+                                AppleIntelligenceLink(destination: appleIntelligenceURL)
+                            }
 
-                CloudFallbackButton()
-            }
-            .padding()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    GlassEffectContainer {
-                        Button(action: {
-                            showWhyAISheet = true
-                        }) {
-                            Label("Why AI?", systemImage: "sparkles")
+                            VStack(spacing: 2) {
+                                Text("For more info:")
+                                AppleIntelligenceLink(destination: appleIntelligenceURL)
+                            }
                         }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     }
+
+                    CloudFallbackButton()
+                }
+                .padding()
+                .readableContentWidth()
+            }
+            .defaultScrollAnchor(.center, for: .alignment)
+            .scrollBounceBehavior(.basedOnSize)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Why AI?", systemImage: "sparkles", action: presentWhyAI)
                 }
             }
-            .sheet(isPresented: $showWhyAISheet) {
-                WhyAIView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.ultraThinMaterial)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
+            .whyAISheet(isPresented: $showWhyAISheet)
         }
+    }
+
+    private func presentWhyAI() {
+        showWhyAISheet = true
     }
 }
 

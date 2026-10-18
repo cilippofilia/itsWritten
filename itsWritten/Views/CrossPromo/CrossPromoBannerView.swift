@@ -8,6 +8,7 @@ import SwiftUI
 
 /// A persistent ambient banner ad for Filippo Cilia's other apps, refreshed each time this view
 /// appears.
+@available(iOS 26.0, *)
 struct CrossPromoBannerView: View {
     @Environment(RemoveAdsStore.self) private var removeAdsStore
 
@@ -33,7 +34,7 @@ struct CrossPromoBannerView: View {
         }
         .sheet(isPresented: $showRemoveAdsPaywall) {
             CrossPromoRemoveAdsInfoView()
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
         }
     }
 
@@ -47,6 +48,7 @@ struct CrossPromoBannerView: View {
     }
 }
 
+@available(iOS 26.0, *)
 #Preview {
     CrossPromoBannerView()
         .environment(RemoveAdsStore())

@@ -31,15 +31,10 @@ struct HomeContentView: View {
             }
         }
         .animation(.default, value: viewModel.mode)
-        .alert(activeAlert?.title ?? "", isPresented: .init(
-            get: { activeAlert != nil },
-            set: { if !$0 { activeAlert = nil } }
-        )) {
-            Button(activeAlert?.buttonText ?? "OK") {
-                activeAlert = nil
-            }
-        } message: {
-            Text(activeAlert?.message ?? "")
+        .alert(activeAlert?.title ?? "", item: $activeAlert) { alert in
+            Button(alert.buttonText) {}
+        } message: { alert in
+            Text(alert.message)
         }
         .onChange(of: countDownViewModel.timerExpired) { _, expired in
             if expired {
@@ -55,7 +50,7 @@ struct HomeContentView: View {
     @MainActor
     private func performSend() async {
         guard isSending == false else { return }
-        let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = text.trimmed
         guard prompt.isEmpty == false else { return }
 
         isSending = true
@@ -80,4 +75,5 @@ struct HomeContentView: View {
     .environment(CountdownViewModel())
     .environment(ConversationViewModel())
     .environment(RemoveAdsStore())
+    .environment(NewChatTransition())
 }
