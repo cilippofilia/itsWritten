@@ -58,6 +58,12 @@ final class ChatModelTests: XCTestCase {
         XCTAssertTrue(message.toolSources.isEmpty)
     }
 
+    func testChatMessageDefaultsToNoProviderName() {
+        let message = ChatMessage(content: "Hello", isUser: false)
+
+        XCTAssertNil(message.providerName)
+    }
+
     func testMedicalPromptAnalyzerDefaultsToHumansWhenPopulationIsMissing() {
         let question = MedicalPromptAnalyzer.clarifyingQuestion(for: "Is magnesium good for sleep?")
 

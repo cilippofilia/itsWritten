@@ -35,6 +35,9 @@ final class ChatMessage: Identifiable {
     var timestamp: Date
     var toolNames: [String] = []
     var toolSources: [ChatMessageSource] = []
+    /// Display name of the cloud model that wrote this reply, or `nil` when it was
+    /// written on device (or by the user).
+    var providerName: String? = nil
 
     init(
         id: UUID = UUID(),
@@ -42,7 +45,8 @@ final class ChatMessage: Identifiable {
         isUser: Bool,
         timestamp: Date = .now,
         toolNames: [String] = [],
-        toolSources: [ChatMessageSource] = []
+        toolSources: [ChatMessageSource] = [],
+        providerName: String? = nil
     ) {
         self.id = id
         self.content = content
@@ -50,6 +54,7 @@ final class ChatMessage: Identifiable {
         self.timestamp = timestamp
         self.toolNames = toolNames
         self.toolSources = toolSources
+        self.providerName = providerName
     }
 }
 

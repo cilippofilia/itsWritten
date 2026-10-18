@@ -8,12 +8,16 @@
 import FoundationModels
 import SwiftData
 import SwiftUI
+import VoltaSDK
 
 /// Owns the state and behavior for a single conversation surface: the composer before
 /// a chat starts, and the message thread once it has. Replaces the previous split
 /// between `HomeContentView`'s composer state and the sheet-presented `ChatView`'s
 /// own state, so both live in one place and the chat can be shown inline instead of
 /// modally.
+///
+/// Model calls go through the app's `AIOrchestrator`. There is no stored session:
+/// every send rebuilds the history from `messages` with `ChatHistoryBuilder`.
 @MainActor
 @Observable
 final class ConversationViewModel {
@@ -22,12 +26,26 @@ final class ConversationViewModel {
         case chatting
     }
 
+    /// Shown in place of a reply when no on-device answer was possible and the user
+    /// declined (or had no) cloud fallback.
+    static let stayedOnDeviceMessage = "This stayed on your device. Apple Intelligence couldn't answer, and nothing was sent to a cloud model."
+
+    /// Total character budget for instructions plus history, matching the previous
+    /// transcript compaction.
+    private static let contextCharacterBudget = 4000
+
+    /// Context usage above which the history is compacted before sending, so the
+    /// on-device model keeps answering instead of the chain falling back to the cloud.
+    private static let contextCompactionThreshold = 0.8
+
     private(set) var mode: Mode = .composing
     private(set) var messages: [ChatMessage] = []
     var title = "New Conversation"
     private(set) var threadId: UUID?
-    private(set) var session = AppLanguageModel.session()
     private(set) var isResponding = false
+
+    /// The response work started by the latest send. Exposed so tests can await it.
+    private(set) var responseTask: Task<Void, Never>?
 
     /// Bumped by `reset()` and `resume(thread:config:)`. Captured by in-flight
     /// generation/title work so a stale Task from a superseded conversation can detect
@@ -37,53 +55,45 @@ final class ConversationViewModel {
     private var modelContext: ModelContext?
     private var pubMedStore: PubMedToolStore?
     private var crossPromoSignal: CrossPromoSignal?
+    private var aiProvider: AIProviderStore?
 
     /// Injects the runtime dependencies this view model needs. Must be called once,
     /// from `HomeView.onAppear`, before `startConversation`/`sendMessage`/`resume` are
     /// used — SwiftUI environment values aren't available at `@State` initializer time,
-    /// so they can't be passed into `init`.
+    /// so they can't be passed into `init`. Until it is called, sends do nothing.
     func configure(
         modelContext: ModelContext,
         pubMedStore: PubMedToolStore,
-        crossPromoSignal: CrossPromoSignal
+        crossPromoSignal: CrossPromoSignal,
+        aiProvider: AIProviderStore
     ) {
         self.modelContext = modelContext
         self.pubMedStore = pubMedStore
         self.crossPromoSignal = crossPromoSignal
+        self.aiProvider = aiProvider
     }
 
-    /// Builds a fresh idle session from `config` and prewarms it. Call once, from
+    /// Prewarms the first model in the chain for `config`. Call once, from
     /// `HomeView.onAppear`.
     func prewarmIdleSession(config: ModelConfiguration) {
-        guard mode == .composing else { return }
-        session = configuredSession(config: config)
-        // `prewarm` is a synchronous, non-async FoundationModels call that can block
-        // on the on-device model backend. Apple's own docs note it "does not guarantee
-        // the system loads your assets immediately", so it's safe to defer off the
-        // synchronous caller's path — otherwise it can stall the MainActor run loop
-        // long enough to starve other `.task`s in the view hierarchy (e.g. the
-        // cross-promo ad fetch never gets a chance to start).
-        let instructions = config.instructions
-        Task { @MainActor in
-            session.prewarm(promptPrefix: .init(instructions))
+        guard mode == .composing, let orchestrator = aiProvider?.orchestrator else { return }
+        // Deferred so prewarming never runs on the synchronous caller's path —
+        // otherwise it can stall the MainActor run loop long enough to starve other
+        // `.task`s in the view hierarchy (e.g. the cross-promo ad fetch).
+        let instructions = Self.instructions(from: config)
+        Task {
+            await orchestrator.prewarm(instructions: instructions, tools: AppLanguageModel.tools)
         }
-    }
-
-    /// Rebuilds the session from `config` without prewarming. Only meaningful while
-    /// chatting — matches the previous behavior where only the active `ChatView`
-    /// rebuilt its session in response to instruction changes.
-    func rebuildSession(config: ModelConfiguration) {
-        guard mode == .chatting else { return }
-        session = configuredSession(config: config)
     }
 
     /// Loads a previously saved thread into the conversation and switches to chat mode.
     func resume(thread: ChatThread, config: ModelConfiguration) {
         generation += 1
+        responseTask?.cancel()
+        aiProvider?.consent.resetConversationGrants()
         messages = Self.orderedMessages(from: thread.messages)
         title = thread.title
         threadId = thread.id
-        session = buildSession(from: messages, config: config)
         isResponding = false
         mode = .chatting
     }
@@ -91,40 +101,13 @@ final class ConversationViewModel {
     /// Clears the current conversation and returns to the composer.
     func reset(config: ModelConfiguration) {
         generation += 1
+        responseTask?.cancel()
+        aiProvider?.consent.resetConversationGrants()
         messages = []
         title = "New Conversation"
         threadId = nil
         isResponding = false
-        session = configuredSession(config: config)
         mode = .composing
-    }
-
-    private func configuredSession(config: ModelConfiguration) -> LanguageModelSession {
-        if config.instructions.isReallyEmpty {
-            return AppLanguageModel.session()
-        }
-        return AppLanguageModel.session(instructions: config.instructions)
-    }
-
-    private func buildSession(from messages: [ChatMessage], config: ModelConfiguration) -> LanguageModelSession {
-        var entries: [Transcript.Entry] = []
-
-        if config.instructions.isReallyEmpty == false {
-            let instructionSegment = Transcript.Segment.text(.init(content: config.instructions))
-            let instructions = Transcript.Instructions(segments: [instructionSegment], toolDefinitions: [])
-            entries.append(.instructions(instructions))
-        }
-
-        for message in messages {
-            let segment = Transcript.Segment.text(.init(content: message.content))
-            if message.isUser {
-                entries.append(.prompt(Transcript.Prompt(segments: [segment])))
-            } else {
-                entries.append(.response(Transcript.Response(assetIDs: [], segments: [segment])))
-            }
-        }
-
-        return AppLanguageModel.session(transcript: Transcript(entries: entries))
     }
 
     static func orderedMessages(from messages: [ChatMessage]) -> [ChatMessage] {
@@ -134,6 +117,11 @@ final class ConversationViewModel {
             }
             return $0.id.uuidString < $1.id.uuidString
         }
+    }
+
+    /// The instructions to send, or `nil` when the user cleared them.
+    private static func instructions(from config: ModelConfiguration) -> String? {
+        config.instructions.isReallyEmpty ? nil : config.instructions
     }
 }
 
@@ -145,7 +133,6 @@ extension ConversationViewModel {
     /// chat surface.
     func startConversation(with prompt: String, config: ModelConfiguration, responseType: ModelResponseType) {
         mode = .chatting
-        session = configuredSession(config: config)
         send(prompt, config: config, responseType: responseType)
     }
 
@@ -159,15 +146,19 @@ extension ConversationViewModel {
     /// so an error here should not interrupt the user — it just leaves the
     /// "New Conversation" placeholder.
     func generateAndSetTitle(from prompt: String) async {
+        guard let orchestrator = aiProvider?.orchestrator else { return }
         let myGeneration = generation
         let instructions = """
         Summarize the prompt into a short title of 5 to 8 words.
         DO NOT use tools, lists, markdown, numbering, or quotes.
         Return only the title text.
         """
-        let titleSession = AppLanguageModel.sessionWithoutTools(instructions: instructions)
 
-        guard let generated = try? await lastStreamedContent(from: titleSession, prompt: prompt) else { return }
+        guard let generated = try? await orchestrator.respond(
+            to: prompt,
+            instructions: instructions,
+            need: .lightweight
+        ) else { return }
         guard myGeneration == generation else { return }
 
         let normalized = generated
@@ -184,16 +175,8 @@ extension ConversationViewModel {
         persistCurrentTurn()
     }
 
-    private func lastStreamedContent(from session: LanguageModelSession, prompt: String) async throws -> String {
-        var result = ""
-        for try await partial in session.streamResponse(to: prompt) {
-            result = partial.content
-        }
-        return result
-    }
-
     private func send(_ prompt: String, config: ModelConfiguration, responseType: ModelResponseType) {
-        guard prompt.isReallyEmpty == false else { return }
+        guard prompt.isReallyEmpty == false, aiProvider != nil else { return }
         pubMedStore?.reset()
         let trimmedPrompt = prompt.trimmed
         append(ChatMessage(content: trimmedPrompt, isUser: true))
@@ -205,26 +188,48 @@ extension ConversationViewModel {
             return
         }
 
-        session = compactedSessionFromMessages(config: config, excludingLastAssistant: false)
+        let instructions = Self.instructions(from: config)
+        let request = ModelRequest(
+            instructions: instructions,
+            options: config.generationOptions,
+            snapshot: Self.orderedMessages(from: messages),
+            characterBudget: max(0, Self.contextCharacterBudget - (instructions?.count ?? 0))
+        )
 
         let sendGeneration = generation
-        Task {
+        responseTask = Task {
+            var request = request
+            await compactIfNeeded(&request)
+            guard sendGeneration == generation else { return }
             switch responseType {
-            case .standard: await generateStandardResponse(for: resolvedPrompt, config: config, generation: sendGeneration)
-            case .streaming: await generateStreamingResponse(for: resolvedPrompt, config: config, generation: sendGeneration)
-            case .human: await generateHumanResponse(for: resolvedPrompt, config: config, generation: sendGeneration)
+            case .standard: await generateStandardResponse(for: resolvedPrompt, request: request, generation: sendGeneration)
+            case .streaming: await generateStreamingResponse(for: resolvedPrompt, request: request, generation: sendGeneration)
+            case .human: await generateHumanResponse(for: resolvedPrompt, request: request, generation: sendGeneration)
             }
         }
     }
 
+    /// On iOS 26.4+, halves the history budget when the history already fills most of
+    /// the first model's context window.
+    private func compactIfNeeded(_ request: inout ModelRequest) async {
+        guard #available(iOS 26.4, macOS 26.4, *) else { return }
+        guard let orchestrator = aiProvider?.orchestrator else { return }
+        let usage = await orchestrator.contextUsage(
+            instructions: request.instructions,
+            history: request.history(isRefusal: isRefusalMessage)
+        )
+        guard (usage?.fraction ?? 0) >= Self.contextCompactionThreshold else { return }
+        request.characterBudget /= 2
+    }
+
     /// Generates a response using the standard (non-streaming) approach. Handles
-    /// context window overflow by compacting the session and retrying.
-    private func generateStandardResponse(for prompt: String, config: ModelConfiguration, generation: Int) async {
+    /// context window overflow by compacting the history and retrying.
+    private func generateStandardResponse(for prompt: String, request: ModelRequest, generation: Int) async {
         guard generation == self.generation else { return }
         isResponding = true
         defer { if generation == self.generation { isResponding = false } }
 
-        let response = await generateResponseWithRecovery(for: prompt, config: config)
+        let response = await generateResponseWithRecovery(for: prompt, request: request)
         guard generation == self.generation else { return }
         if let response {
             append(makeAssistantMessage(from: response))
@@ -234,8 +239,8 @@ extension ConversationViewModel {
     }
 
     /// Generates a response using streaming, updating the UI as tokens arrive. Handles
-    /// context window overflow by compacting and retrying.
-    private func generateStreamingResponse(for prompt: String, config: ModelConfiguration, generation: Int) async {
+    /// failures by compacting the history and retrying without streaming.
+    private func generateStreamingResponse(for prompt: String, request: ModelRequest, generation: Int) async {
         guard generation == self.generation else { return }
         isResponding = true
         defer { if generation == self.generation { isResponding = false } }
@@ -243,7 +248,6 @@ extension ConversationViewModel {
         let messageId = UUID()
         let timestamp = Date()
         var messageIndex: Int?
-        var streamedContent = ""
 
         do {
             let preparedRequest = await prepareModelRequest(for: prompt)
@@ -251,70 +255,88 @@ extension ConversationViewModel {
             switch preparedRequest {
             case .assistantResponse(let response):
                 append(makeAssistantMessage(from: response, id: messageId, timestamp: timestamp))
-                return
             case .prompt(let preparedPrompt):
-                for try await partial in session.streamResponse(to: preparedPrompt, options: config.generationOptions) {
+                guard let reply = try await streamReply(
+                    to: preparedPrompt,
+                    request: request,
+                    generation: generation,
+                    placeholder: (messageId, timestamp),
+                    messageIndex: &messageIndex
+                ) else { return }
+                let response = buildAssistantResponse(from: reply.content, providerName: reply.providerName)
+                var final = response
+                if isRefusalMessage(response.content) {
+                    let recovered = await recoverAfterFailure(for: prompt, request: request)
                     guard generation == self.generation else { return }
-                    streamedContent = partial.content
-
-                    withAnimation(.default) {
-                        if let messageIndex {
-                            messages[messageIndex] = ChatMessage(
-                                id: messageId,
-                                content: partial.content,
-                                isUser: false,
-                                timestamp: timestamp
-                            )
-                        } else {
-                            messages.append(
-                                ChatMessage(
-                                    id: messageId,
-                                    content: partial.content,
-                                    isUser: false,
-                                    timestamp: timestamp
-                                )
-                            )
-                            messageIndex = messages.endIndex - 1
-                        }
-                    }
+                    final = recovered ?? recoveryFailureResponse
                 }
-            }
-            guard generation == self.generation else { return }
-            let response = buildAssistantResponse(from: streamedContent)
-            if isRefusalMessage(response.content), let recovered = await recoverAfterFailure(for: prompt, config: config) {
-                guard generation == self.generation else { return }
                 replaceStreamedMessage(
                     at: &messageIndex,
-                    with: makeAssistantMessage(from: recovered, id: messageId, timestamp: timestamp)
-                )
-            } else if isRefusalMessage(response.content) {
-                guard generation == self.generation else { return }
-                replaceStreamedMessage(
-                    at: &messageIndex,
-                    with: ChatMessage(id: messageId, content: recoveryFailureMessage, isUser: false, timestamp: timestamp)
-                )
-            } else {
-                replaceStreamedMessage(
-                    at: &messageIndex,
-                    with: makeAssistantMessage(from: response, id: messageId, timestamp: timestamp)
+                    with: makeAssistantMessage(from: final, id: messageId, timestamp: timestamp)
                 )
             }
         } catch {
             guard generation == self.generation else { return }
-            if let recovered = await recoverAfterFailure(for: prompt, config: config) {
+            var final = stayedOnDeviceResponse
+            if Self.failureKind(of: error) != .staysOnDevice {
+                let recovered = await recoverAfterFailure(for: prompt, request: request)
                 guard generation == self.generation else { return }
-                replaceStreamedMessage(
-                    at: &messageIndex,
-                    with: makeAssistantMessage(from: recovered, id: messageId, timestamp: timestamp)
+                final = recovered ?? recoveryFailureResponse
+            }
+            replaceStreamedMessage(
+                at: &messageIndex,
+                with: makeAssistantMessage(from: final, id: messageId, timestamp: timestamp)
+            )
+        }
+    }
+
+    /// Streams the reply into a placeholder assistant message, appending each text
+    /// delta. Returns the full text and its provenance, or `nil` if the conversation
+    /// was superseded mid-stream.
+    private func streamReply(
+        to prompt: String,
+        request: ModelRequest,
+        generation: Int,
+        placeholder: (id: UUID, timestamp: Date),
+        messageIndex: inout Int?
+    ) async throws -> StreamedReply? {
+        guard let orchestrator = aiProvider?.orchestrator else { return nil }
+        var content = ""
+        var providerName: String?
+        let stream = await orchestrator.streamDetailed(
+            to: prompt,
+            instructions: request.instructions,
+            history: request.history(isRefusal: isRefusalMessage),
+            tools: AppLanguageModel.tools,
+            options: request.options
+        )
+
+        for try await event in stream {
+            guard generation == self.generation else { return nil }
+            switch event {
+            case .began(let provider, let privacyLevel):
+                providerName = Self.providerName(provider: provider, privacyLevel: privacyLevel)
+            case .text(let delta):
+                content += delta
+                let message = ChatMessage(
+                    id: placeholder.id,
+                    content: content,
+                    isUser: false,
+                    timestamp: placeholder.timestamp,
+                    providerName: providerName
                 )
-            } else {
-                guard generation == self.generation else { return }
-                replaceStreamedMessage(
-                    at: &messageIndex,
-                    with: ChatMessage(id: messageId, content: recoveryFailureMessage, isUser: false, timestamp: timestamp)
-                )
+                withAnimation(.default) {
+                    if let messageIndex {
+                        messages[messageIndex] = message
+                    } else {
+                        messages.append(message)
+                        messageIndex = messages.endIndex - 1
+                    }
+                }
             }
         }
+        guard generation == self.generation else { return nil }
+        return StreamedReply(content: content, providerName: providerName)
     }
 
     private func replaceStreamedMessage(at messageIndex: inout Int?, with message: ChatMessage) {
@@ -327,7 +349,7 @@ extension ConversationViewModel {
     }
 
     /// Generates a response with simulated human-like typing delays.
-    private func generateHumanResponse(for prompt: String, config: ModelConfiguration, generation: Int) async {
+    private func generateHumanResponse(for prompt: String, request: ModelRequest, generation: Int) async {
         guard generation == self.generation else { return }
         let startTime = ContinuousClock.now
 
@@ -336,7 +358,7 @@ extension ConversationViewModel {
             guard generation == self.generation else { return }
             isResponding = true
 
-            guard let response = await generateResponseWithRecovery(for: prompt, config: config) else {
+            guard let response = await generateResponseWithRecovery(for: prompt, request: request) else {
                 guard generation == self.generation else { return }
                 appendRecoveryFailureMessage()
                 isResponding = false
@@ -377,96 +399,82 @@ extension ConversationViewModel {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func generateResponseWithRecovery(for prompt: String, config: ModelConfiguration) async -> AssistantResponse? {
+    /// Answers `prompt` without streaming. Refusals, guardrail violations and context
+    /// overflow retry once with a compacted history. Returns `nil` when no answer could
+    /// be produced.
+    private func generateResponseWithRecovery(for prompt: String, request: ModelRequest) async -> AssistantResponse? {
+        guard let orchestrator = aiProvider?.orchestrator else { return nil }
         do {
             let preparedRequest = await prepareModelRequest(for: prompt)
             switch preparedRequest {
             case .assistantResponse(let response):
                 return response
             case .prompt(let preparedPrompt):
-                let response = try await session.respond(to: preparedPrompt, options: config.generationOptions)
-                let assistantResponse = buildAssistantResponse(from: response.content)
+                let response = try await orchestrator.respondDetailed(
+                    to: preparedPrompt,
+                    instructions: request.instructions,
+                    history: request.history(isRefusal: isRefusalMessage),
+                    tools: AppLanguageModel.tools,
+                    options: request.options
+                )
+                let assistantResponse = buildAssistantResponse(from: response)
                 if isRefusalMessage(assistantResponse.content) {
-                    return await recoverAfterFailure(for: prompt, config: config)
+                    return await recoverAfterFailure(for: prompt, request: request)
                 }
                 return assistantResponse
             }
-        } catch LanguageModelSession.GenerationError.exceededContextWindowSize {
-            return await recoverAfterFailure(for: prompt, config: config)
-        } catch LanguageModelSession.GenerationError.guardrailViolation {
-            return await recoverAfterFailure(for: prompt, config: config)
         } catch {
-            return nil
+            switch Self.failureKind(of: error) {
+            case .recoverable: return await recoverAfterFailure(for: prompt, request: request)
+            case .staysOnDevice: return stayedOnDeviceResponse
+            case .other: return nil
+            }
         }
     }
 
-    private func recoverAfterFailure(for prompt: String, config: ModelConfiguration) async -> AssistantResponse? {
-        session = compactedSessionFromMessages(config: config, excludingLastAssistant: true)
+    /// Retries once with a compacted history that also drops the last assistant turn.
+    private func recoverAfterFailure(for prompt: String, request: ModelRequest) async -> AssistantResponse? {
+        guard let orchestrator = aiProvider?.orchestrator else { return nil }
         do {
             let preparedRequest = await prepareModelRequest(for: prompt)
             switch preparedRequest {
             case .assistantResponse(let response):
                 return response
             case .prompt(let preparedPrompt):
-                let response = try await session.respond(to: preparedPrompt, options: config.generationOptions)
-                let assistantResponse = buildAssistantResponse(from: response.content)
+                let response = try await orchestrator.respondDetailed(
+                    to: preparedPrompt,
+                    instructions: request.instructions,
+                    history: request.history(excludingLastAssistant: true, isRefusal: isRefusalMessage),
+                    tools: AppLanguageModel.tools,
+                    options: request.options
+                )
+                let assistantResponse = buildAssistantResponse(from: response)
                 return isRefusalMessage(assistantResponse.content) ? nil : assistantResponse
             }
         } catch {
-            return nil
+            return Self.failureKind(of: error) == .staysOnDevice ? stayedOnDeviceResponse : nil
         }
     }
 
-    private func compactedSessionFromMessages(
-        config: ModelConfiguration,
-        excludingLastAssistant: Bool,
-        maxCharacters: Int = 4000
-    ) -> LanguageModelSession {
-        var entries: [Transcript.Entry] = []
-
-        if config.instructions.isReallyEmpty == false {
-            let instructionSegment = Transcript.Segment.text(.init(content: config.instructions))
-            let instructions = Transcript.Instructions(segments: [instructionSegment], toolDefinitions: [])
-            entries.append(.instructions(instructions))
+    /// Sorts a model error into how the conversation should react to it.
+    private static func failureKind(of error: any Error) -> FailureKind {
+        switch error as? ProviderError {
+        case .guardrailViolation, .contextWindowExceeded:
+            .recoverable
+        case .privacyRestricted, .noProviderAvailable, .capabilityUnavailable:
+            .staysOnDevice
+        default:
+            .other
         }
-
-        var ordered = Self.orderedMessages(from: messages)
-        if excludingLastAssistant, let last = ordered.last, last.isUser == false {
-            ordered.removeLast()
-        }
-
-        for message in ordered {
-            if message.isUser == false, isRefusalMessage(message.content) {
-                continue
-            }
-            let segment = Transcript.Segment.text(.init(content: message.content))
-            if message.isUser {
-                entries.append(.prompt(Transcript.Prompt(segments: [segment])))
-            } else {
-                entries.append(.response(Transcript.Response(assetIDs: [], segments: [segment])))
-            }
-        }
-
-        guard let first = entries.first else {
-            return session
-        }
-
-        var selected = [first]
-        var totalInstructionLength = String(describing: first).count
-        var recentEntries: [Transcript.Entry] = []
-
-        for entry in entries.dropFirst().reversed() {
-            let entryEstimateLength = String(describing: entry).count
-            guard totalInstructionLength + entryEstimateLength <= maxCharacters else { break }
-            recentEntries.insert(entry, at: 0)
-            totalInstructionLength += entryEstimateLength
-        }
-
-        selected.append(contentsOf: recentEntries)
-        return AppLanguageModel.session(transcript: Transcript(entries: selected))
     }
 
-    /// Pure string matching against known refusal phrasing — no FoundationModels call
+    /// The cloud model's display name when it answered, or `nil` for on-device answers.
+    private static func providerName(provider: ProviderIdentifier, privacyLevel: PrivacyLevel) -> String? {
+        guard privacyLevel != .onDevice else { return nil }
+        return ConsentDestination(provider: provider, privacyLevel: privacyLevel)?.displayName
+    }
+
+    /// Pure string matching against known refusal phrasing — no model call
     /// involved, kept `internal` (not `private`) so it's directly unit-testable.
     func isRefusalMessage(_ content: String) -> Bool {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -477,11 +485,27 @@ extension ConversationViewModel {
         "I couldn't continue with that request. Try rephrasing, shortening the message, or starting a new chat."
     }
 
-    private func buildAssistantResponse(from content: String) -> AssistantResponse {
+    private var recoveryFailureResponse: AssistantResponse {
+        AssistantResponse(content: recoveryFailureMessage, toolNames: [], toolSources: [], providerName: nil)
+    }
+
+    private var stayedOnDeviceResponse: AssistantResponse {
+        AssistantResponse(content: Self.stayedOnDeviceMessage, toolNames: [], toolSources: [], providerName: nil)
+    }
+
+    private func buildAssistantResponse(from response: AIResponse) -> AssistantResponse {
+        buildAssistantResponse(
+            from: response.text,
+            providerName: Self.providerName(provider: response.provider, privacyLevel: response.privacyLevel)
+        )
+    }
+
+    private func buildAssistantResponse(from content: String, providerName: String?) -> AssistantResponse {
         AssistantResponse(
             content: sanitizedResponse(content),
             toolNames: currentToolNames(),
-            toolSources: currentToolSources()
+            toolSources: currentToolSources(),
+            providerName: providerName
         )
     }
 
@@ -501,7 +525,8 @@ extension ConversationViewModel {
                 AssistantResponse(
                     content: "I couldn't find relevant human PubMed evidence for that question. Try being more specific about the condition, treatment, or outcome you want to check.",
                     toolNames: [],
-                    toolSources: []
+                    toolSources: [],
+                    providerName: nil
                 )
             )
         } catch PubMedSearchError.rateLimited {
@@ -509,7 +534,8 @@ extension ConversationViewModel {
                 AssistantResponse(
                     content: "PubMed is temporarily rate-limiting requests, so I couldn't verify that with research right now. Try again in a moment.",
                     toolNames: [],
-                    toolSources: []
+                    toolSources: [],
+                    providerName: nil
                 )
             )
         } catch {
@@ -517,7 +543,8 @@ extension ConversationViewModel {
                 AssistantResponse(
                     content: "I couldn't retrieve PubMed evidence right now, so I don't want to guess. Try again in a moment or rephrase the question more specifically.",
                     toolNames: [],
-                    toolSources: []
+                    toolSources: [],
+                    providerName: nil
                 )
             )
         }
@@ -586,13 +613,14 @@ extension ConversationViewModel {
             isUser: false,
             timestamp: timestamp,
             toolNames: response.toolNames,
-            toolSources: response.toolSources
+            toolSources: response.toolSources,
+            providerName: response.providerName
         )
     }
 
     /// Appends a message to the conversation and persists it immediately. `internal`
     /// (not `private`) so autosave behavior can be driven directly from tests without
-    /// requiring a live FoundationModels call.
+    /// requiring a live model call.
     func append(_ message: ChatMessage) {
         messages.append(message)
         persistCurrentTurn()
@@ -650,6 +678,45 @@ private struct AssistantResponse {
     let content: String
     let toolNames: [String]
     let toolSources: [ChatMessageSource]
+    /// Display name of the cloud model that answered; `nil` on device.
+    let providerName: String?
+}
+
+/// The full text of a streamed reply and who wrote it.
+private struct StreamedReply {
+    let content: String
+    let providerName: String?
+}
+
+/// How a send reacts to a model error.
+private enum FailureKind {
+    /// Retry once with a compacted history.
+    case recoverable
+    /// Nothing could answer without leaving the device; tell the user, don't retry.
+    case staysOnDevice
+    /// Show the generic failure copy.
+    case other
+}
+
+/// Everything a single send needs to call the model, captured when the user sends.
+private struct ModelRequest {
+    let instructions: String?
+    let options: GenerationOptions
+    /// The ordered conversation at send time, ending with the in-flight user message.
+    let snapshot: [ChatMessage]
+    /// Character budget for history turns; halved when the context is nearly full.
+    var characterBudget: Int
+
+    /// The history to send, without the in-flight user message (it is the prompt).
+    func history(excludingLastAssistant: Bool = false, isRefusal: (String) -> Bool) -> [ChatTurn] {
+        ChatHistoryBuilder.turns(
+            from: snapshot,
+            excludingLastAssistant: excludingLastAssistant,
+            excludingTrailingUser: true,
+            isRefusal: isRefusal,
+            characterBudget: characterBudget
+        )
+    }
 }
 
 private enum PreparedModelRequest {

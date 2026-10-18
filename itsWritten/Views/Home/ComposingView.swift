@@ -22,7 +22,7 @@ struct ComposingView: View {
                 text: $text,
                 isFocused: $isFocused,
                 placeholderText: homeViewModel.placeholderText,
-                isResponding: viewModel.session.isResponding
+                isResponding: viewModel.isResponding
             )
             #if !DEBUG
             .hideSensitiveData()
@@ -42,7 +42,7 @@ struct ComposingView: View {
 
                 HomeFooterView(
                     text: text,
-                    isResponding: viewModel.session.isResponding,
+                    isResponding: viewModel.isResponding,
                     sendAction: sendAction
                 )
             }

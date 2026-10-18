@@ -33,9 +33,6 @@ struct ChatConversationView: View {
         .hideSensitiveData()
         #endif
         .navigationTitle(viewModel.title)
-        .onChange(of: config.instructions) {
-            viewModel.rebuildSession(config: config)
-        }
     }
 
     private func sendMessage() {

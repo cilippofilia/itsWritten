@@ -28,6 +28,12 @@ struct MessageBubble: View {
                 .foregroundStyle(message.isUser ? Color.white : Color.primary)
                 .clipShape(.rect(cornerRadius: 18))
 
+            if message.isUser == false, let providerName = message.providerName {
+                Text("Answered by \(providerName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if message.isUser == false, message.toolNames.isEmpty == false || message.toolSources.isEmpty == false {
                 Button {
                     discloseToolsUsed.toggle()

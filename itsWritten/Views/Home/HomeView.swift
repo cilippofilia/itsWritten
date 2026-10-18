@@ -18,6 +18,7 @@ struct HomeView: View {
     @Environment(CrossPromoSignal.self) private var crossPromoSignal
     @Environment(RemoveAdsStore.self) private var removeAdsStore
     @Environment(PubMedToolStore.self) private var pubMedStore
+    @Environment(AIProviderStore.self) private var aiProvider
     @Environment(\.modelContext) private var modelContext
 
     @State private var config = ModelConfiguration()
@@ -51,7 +52,8 @@ struct HomeView: View {
                 conversationViewModel.configure(
                     modelContext: modelContext,
                     pubMedStore: pubMedStore,
-                    crossPromoSignal: crossPromoSignal
+                    crossPromoSignal: crossPromoSignal,
+                    aiProvider: aiProvider
                 )
                 conversationViewModel.prewarmIdleSession(config: config)
             }
@@ -132,5 +134,6 @@ struct HomeView: View {
         .environment(CrossPromoSignal())
         .environment(RemoveAdsStore())
         .environment(PubMedToolStore.shared)
+        .environment(AIProviderStore())
         .modelContainer(for: [ChatThread.self, ChatMessage.self], inMemory: true)
 }
