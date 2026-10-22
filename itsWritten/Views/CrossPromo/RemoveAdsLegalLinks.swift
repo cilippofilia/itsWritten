@@ -11,6 +11,6 @@ enum RemoveAdsLegalLinks {
     /// configured in App Store Connect.
     static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 
-    /// Same URL configured as itsWritten's Privacy Policy in App Store Connect's App Information.
-    static let privacyPolicy = URL(string: "https://www.freeprivacypolicy.com/live/f261dc23-a6ac-480d-b77e-947f75bbc5e3")!
+    /// Keep in sync with the Privacy Policy URL in App Store Connect's App Information.
+    static let privacyPolicy = URL(string: "https://cilippofilia.dev/itswritten/privacy-policy")!
 }
