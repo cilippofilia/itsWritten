@@ -1,0 +1,1009 @@
+//
+//  AIOrchestrator.swift
+//  VoltaSDK
+//
+//  The orchestrator and the stable public API.
+//  On iOS 26 it resolves between two providers (on-device + developer key)
+//  with automatic fallback and privacy disclosure. The same public surface
+//  will carry iOS 27, which adds PCC, user-account providers, and the
+//  per-need chain (.lightweight / .reasoning / .largeContext).
+//
+//  Naming note: the type is NOT named after the module (VoltaSDK)
+//  because in Swift a type that shadows its own module makes it impossible
+//  to qualify other symbols (`VoltaSDK.Xyz` would always resolve the
+//  type, never the module). "Orchestrator" also reflects the framework's
+//  real value: model resolution, not agent execution.
+//
+
+import Foundation
+import FoundationModels
+import Synchronization
+import os
+
+// MARK: - Per-call need (D7)
+
+/// What a call NEEDS, expressed per call: it REORDERS the fallback chain for
+/// that one call — it never replaces it. Every provider stays eligible;
+/// availability, the token pre-flight (D13), and the privacy policy still
+/// walk the whole (reordered) chain, so a need can never strand a call that
+/// a lower-ranked provider could have served.
+public enum ModelNeed: Sendable, Hashable {
+    /// Favour cheap, fast, private: on-device → PCC → external.
+    case lightweight
+    /// Favour capable models: PCC (the reasoning-capable free tier) →
+    /// external → on-device as the last resort.
+    case reasoning
+    /// Favour room AND reliability: Apple cloud → external — each tier
+    /// sorted by known context window — with on-device LAST (D7 amendment,
+    /// Sep 2026: long-context work shouldn't lean on the small on-device
+    /// model's consistency; it stays reachable as the final fallback). The
+    /// D13 pre-flight still guards every window reactively: a provider whose
+    /// window the measured call exceeds is skipped, hint or no hint.
+    case largeContext
+}
+
+// MARK: - Selection preference
+
+/// Configuration-time ordering of the chain. The per-call `ModelNeed` (D7)
+/// reorders it for a single call; the strict `…Only` modes are effectively
+/// immune (their chains hold a single tier).
+public enum ModelPreference: Sendable, CaseIterable {
+    /// On-device if available, otherwise developer key. Sensible default.
+    case preferOnDevice
+    /// Developer key first, on-device as the safety net.
+    case preferDeveloperKey
+    /// On-device only. Errors if unavailable.
+    case onDeviceOnly
+    /// Developer key only.
+    case developerKeyOnly
+}
+
+// MARK: - Configuration
+
+/// A user's own cloud account (iOS 27): the user supplies the credential and
+/// is billed, as opposed to the developer key (`developerKey`) the app pays
+/// for. Reached through the public `LanguageModel` protocol.
+///
+/// The credential is a **token provider**, resolved when a call is made
+/// (session 339): a static key, a Keychain read, or a refreshed OAuth token
+/// all fit. A static-key convenience initializer covers the simple case.
+public struct UserAccount: Sendable {
+    public var vendor: CloudVendor
+    /// Model name within the vendor; `nil` = the vendor's default.
+    public var model: String?
+    /// Resolves the current credential at call time.
+    public var token: @Sendable () async throws -> String
+    /// Whether the account is connected — drives availability without a
+    /// network call. `true` by default for token providers; the key
+    /// convenience derives it from the key being non-empty.
+    public var isConnected: Bool
+
+    /// Token-provider initializer (OAuth / Keychain / any async source).
+    public init(
+        vendor: CloudVendor,
+        model: String? = nil,
+        isConnected: Bool = true,
+        token: @escaping @Sendable () async throws -> String
+    ) {
+        self.vendor = vendor
+        self.model = model
+        self.isConnected = isConnected
+        self.token = token
+    }
+
+    /// Static-key convenience. An empty key means "not connected".
+    public init(vendor: CloudVendor, apiKey: String, model: String? = nil) {
+        self.init(
+            vendor: vendor,
+            model: model,
+            isConnected: !apiKey.isEmpty,
+            token: { apiKey }
+        )
+    }
+}
+
+/// A vendor- or app-supplied Apple `LanguageModel` (iOS 27) to place in the
+/// fallback chain — the front door for the OFFICIAL vendor packages Apple
+/// announced (e.g. Gemini via Google's Firebase package, Anthropic's Claude
+/// package) without VoltaSDK needing a release per vendor. Anything that
+/// conforms to `LanguageModel` slots in; you say who it is and how private it
+/// is, and it becomes one more provider the chain can resolve to.
+@available(iOS 27.0, macOS 27.0, *)
+public struct CustomLanguageModel: Sendable {
+    /// How the provider shows up in statuses, pickers, and provenance.
+    public var identifier: ProviderIdentifier
+    /// Where its data goes — drives the privacy-disclosure policy (D7/D10).
+    public var privacyLevel: PrivacyLevel
+    /// The model itself, however the vendor exposes it.
+    public var model: any LanguageModel
+
+    public init(
+        _ model: any LanguageModel,
+        identifier: ProviderIdentifier,
+        privacyLevel: PrivacyLevel
+    ) {
+        self.model = model
+        self.identifier = identifier
+        self.privacyLevel = privacyLevel
+    }
+}
+
+public struct AIConfiguration: Sendable {
+    /// Enables the on-device model (requires Apple Intelligence on the device).
+    public var enableOnDevice: Bool = true
+
+    /// Enables Private Cloud Compute (iOS 27+): Apple's free "powered" tier —
+    /// no key, no account, a per-user daily quota (D6). Defaults on: it
+    /// degrades gracefully (skipped where the device/entitlement/quota make it
+    /// unavailable) and ignored entirely on iOS 26. Participates only in the
+    /// `.preferOnDevice` / `.preferDeveloperKey` chains, never in the strict
+    /// `.onDeviceOnly` / `.developerKeyOnly` modes.
+    public var enablePrivateCloudCompute: Bool = true
+
+    /// How the PCC provider learns whether this process carries the
+    /// entitlement (iOS 27+). `.detect` (default) reads the code signature
+    /// on macOS and the embedded provisioning profile on iOS; **an iOS App
+    /// Store build has no profile to read and must state `.granted`** when it
+    /// ships with the capability, or PCC is silently skipped.
+    public var privateCloudComputeEntitlement: PrivateCloudComputeEntitlement = .detect
+
+    /// The user's own cloud accounts (iOS 27+). Each becomes a provider in the
+    /// fallback chain, reached through the public `LanguageModel` protocol.
+    /// Empty by default; ignored entirely on iOS 26. Like the developer key,
+    /// these are external-privacy providers and never auto-selected by the
+    /// `ModelSelector` (the user must connect the account first).
+    public var userAccounts: [UserAccount] = []
+
+    /// Type-erased storage for `customModels` — a stored property cannot be
+    /// availability-gated, the accessor below is.
+    var _customModels: [any Sendable] = []
+
+    /// Vendor- or app-supplied `LanguageModel`s to add to the chain (iOS 27+):
+    /// the plug-in point for the official vendor packages (Gemini via
+    /// Google's Firebase package, Anthropic's Claude package, or your own
+    /// conformance). They trail the built-in providers in the prefer chains
+    /// and are never auto-selected.
+    @available(iOS 27.0, macOS 27.0, *)
+    public var customModels: [CustomLanguageModel] {
+        get { _customModels.compactMap { $0 as? CustomLanguageModel } }
+        set { _customModels = newValue }
+    }
+
+    /// Type-erased storage for `onDeviceModel` — same reason as `_customModels`.
+    // swiftlint:disable:next identifier_name
+    var _onDeviceModel: (any Sendable)?
+
+    /// The system model the on-device provider uses (iOS 26+). Defaults to
+    /// `.default`; set it to select a specific use case or guardrail setup.
+    @available(iOS 26.0, macOS 26.0, *)
+    public var onDeviceModel: SystemLanguageModel {
+        get { _onDeviceModel as? SystemLanguageModel ?? .default }
+        set { _onDeviceModel = newValue }
+    }
+
+    /// Testing aid: keeps the on-device provider first in the chain, so it is
+    /// still the privacy baseline and every step down still asks, but makes it
+    /// report itself unavailable. Lets an app exercise PCC and user-account
+    /// fallback on a device where Apple Intelligence works. Default `false`.
+    public var simulateOnDeviceUnavailable: Bool = false
+
+    /// Cloud provider developer key. Accepts OpenAI, Anthropic (Claude),
+    /// or Google (Gemini) keys — the vendor is auto-detected from the key
+    /// format (D15). Injected by the app, typically from an Xcode secret.
+    /// If nil, no cloud provider is created.
+    public var developerKey: String? = nil
+
+    /// Vendor the key belongs to. `nil` = auto-detect from the key format
+    /// (`sk-ant-…` → Anthropic, `AIza…` → Gemini, `sk-…` → OpenAI);
+    /// set explicitly when detection isn't possible.
+    public var developerKeyVendor: CloudVendor? = nil
+
+    /// Model to use with the developer key. The model name belongs to the
+    /// key's vendor (e.g. "gpt-4o-mini" for OpenAI, "claude-opus-4-8" for
+    /// Anthropic, "gemini-3.6-flash" for Gemini — find the current names at
+    /// each vendor's `CloudVendor.modelDocumentationURL`). `nil` = the
+    /// vendor's default model.
+    public var developerKeyModel: String? = nil
+
+    public var maxTokens: Int = 1000
+    public var temperature: Double = 0.3
+
+    /// Preference order between on-device and developer key.
+    public var preference: ModelPreference = .preferOnDevice
+
+    /// What to do when fallback crosses a privacy threshold downwards
+    /// (e.g. on-device → OpenAI). See `PrivacyDisclosure`.
+    public var privacyDisclosure: PrivacyDisclosure = .log
+
+    /// Rewrites (or blocks) what a provider receives, right before it is
+    /// called. `nil` (default) = every provider receives the call as made.
+    /// See `OutboundFilter`.
+    public var outboundFilter: OutboundFilter? = nil
+
+    /// Pass rates measured by the evaluation engine (D22). With a map set,
+    /// a call that names its task (`task:`) skips any provider that
+    /// measured below the task's floor; unmeasured providers are still
+    /// tried. `nil` (default) = the chain is ordered by tier heuristics only.
+    public var capabilities: MeasuredCapabilities? = nil
+
+    /// The providers the user has switched on, typically the `ModelSelector`'s
+    /// multiple selection. Resolution walks only these, in the chain's order;
+    /// the others stay configured and listed (`providerStatuses`) but never
+    /// answer. `nil` (default) = every configured provider. An empty set means
+    /// nothing may answer: every call fails with `noProviderAvailable`.
+    public var enabledProviders: Set<ProviderIdentifier>? = nil
+
+    public init() {}
+}
+
+// MARK: - Context pressure (D13)
+
+/// How much of the resolved provider's context window the current
+/// conversation would occupy. This is the information the app needs to
+/// decide WHEN to trim or summarize the history (the policy stays with
+/// the app, D12).
+public struct ContextUsage: Sendable, Equatable {
+    public let tokens: Int
+    public let contextSize: Int
+    public let provider: ProviderIdentifier
+
+    /// Occupied fraction, 0...1+ (can exceed 1 if already past the window).
+    public var fraction: Double {
+        contextSize > 0 ? Double(tokens) / Double(contextSize) : 0
+    }
+}
+
+// MARK: - Detailed response
+
+/// Response enriched with provenance: essential for UIs that want to show
+/// which model answered and at which privacy level.
+public struct AIResponse: Sendable {
+    public let text: String
+    public let provider: ProviderIdentifier
+    public let privacyLevel: PrivacyLevel
+
+    public init(text: String, provider: ProviderIdentifier, privacyLevel: PrivacyLevel) {
+        self.text = text
+        self.provider = provider
+        self.privacyLevel = privacyLevel
+    }
+}
+
+/// One step of a streamed response (see `AIOrchestrator.streamDetailed`).
+public enum AIStreamEvent: Sendable, Equatable {
+    /// Emitted once, before the first text fragment: which provider is
+    /// answering and at which privacy level — the streaming counterpart of
+    /// `AIResponse`'s provenance (and session 339's "metadata first").
+    case began(provider: ProviderIdentifier, privacyLevel: PrivacyLevel)
+    /// A fragment of the answer, in arrival order. Fragments are deltas:
+    /// concatenating them yields the full answer.
+    case text(String)
+}
+
+// MARK: - Orchestrator
+
+/// An actor even though its state is immutable today: the planned
+/// extensions (PCC quota tracking, multi-turn session caches) will need
+/// protected mutable state.
+public actor AIOrchestrator {
+
+    let orderedProviders: [any ModelProvider]
+    let privacyDisclosure: PrivacyDisclosure
+    /// The app's outbound filter (`AIConfiguration.outboundFilter`), if any.
+    let outboundFilter: OutboundFilter?
+    /// The capability map (D22), if the app supplied one.
+    let capabilities: MeasuredCapabilities?
+    /// The user's switched-on providers (`AIConfiguration.enabledProviders`); nil = all.
+    let enabledProviders: Set<ProviderIdentifier>?
+    /// Tokens reserved for the response during pre-flight (D13): a call that
+    /// exactly fills the window would fail at generation anyway.
+    let responseTokenReserve: Int
+
+    // MARK: Explicit init (recommended: no global state)
+
+    public init(configuration: AIConfiguration) {
+        self.orderedProviders = Self.buildProviders(from: configuration)
+        self.privacyDisclosure = configuration.privacyDisclosure
+        self.outboundFilter = configuration.outboundFilter
+        self.responseTokenReserve = configuration.maxTokens
+        self.capabilities = configuration.capabilities
+        self.enabledProviders = configuration.enabledProviders
+    }
+
+    /// Direct init with pre-built providers — useful for tests or for
+    /// plugging in custom providers.
+    public init(
+        providers: [any ModelProvider],
+        privacyDisclosure: PrivacyDisclosure = .log,
+        responseTokenReserve: Int = 0,
+        capabilities: MeasuredCapabilities? = nil,
+        enabledProviders: Set<ProviderIdentifier>? = nil,
+        outboundFilter: OutboundFilter? = nil
+    ) {
+        self.orderedProviders = providers
+        self.privacyDisclosure = privacyDisclosure
+        self.outboundFilter = outboundFilter
+        self.responseTokenReserve = responseTokenReserve
+        self.capabilities = capabilities
+        self.enabledProviders = enabledProviders
+    }
+
+    // MARK: Optional singleton for convenience
+
+    public static let shared = AIOrchestrator(configuration: AIConfiguration())
+
+    /// App-configured override. A Mutex because in Swift 6 a non-isolated
+    /// `static var` is not concurrency-safe.
+    private static let _sharedOverride = Mutex<AIOrchestrator?>(nil)
+
+    /// Configures the shared instance. Call once at app launch.
+    /// Example:
+    /// ```
+    /// AIOrchestrator.configure {
+    ///     $0.enableOnDevice = true
+    ///     $0.developerKey = Secrets.openAIKey
+    ///     $0.developerKeyModel = "gpt-4o-mini"
+    ///     $0.preference = .preferOnDevice
+    /// }
+    /// ```
+    public static func configure(_ build: (inout AIConfiguration) -> Void) {
+        var config = AIConfiguration()
+        build(&config)
+        let orchestrator = AIOrchestrator(configuration: config)
+        _sharedOverride.withLock { $0 = orchestrator }
+    }
+
+    /// The active instance (configured override, otherwise the default).
+    public static var active: AIOrchestrator {
+        _sharedOverride.withLock { $0 } ?? shared
+    }
+
+    // MARK: Main API
+
+    /// Generates a response using the best available provider according to
+    /// the preference, falling back automatically to later providers when
+    /// one is unavailable or fails recoverably (429, network, context
+    /// window, language). Stable signature: unchanged on iOS 27.
+    ///
+    /// `history` (D12): the previous conversation turns, owned and supplied
+    /// by the app. The framework never stores them; it forwards them to the
+    /// chosen provider. Every call is self-contained, so fallback works
+    /// mid-conversation too.
+    public func respond(
+        to prompt: String,
+        instructions: String? = nil,
+        history: [ChatTurn] = [],
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
+    ) async throws -> String {
+        try await respondDetailed(
+            to: prompt, instructions: instructions, history: history, need: need, task: task
+        ).text
+    }
+
+    /// Like `respond`, but also returns which provider answered and its
+    /// privacy level (for banners/badges in UI).
+    public func respondDetailed(
+        to prompt: String,
+        instructions: String? = nil,
+        history: [ChatTurn] = [],
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
+    ) async throws -> AIResponse {
+        try await runTextChain(ChainRequest(
+            prompt: prompt, instructions: instructions, history: history,
+            need: need, task: task, mode: .raw, requirement: .plain, tools: []
+        )) { provider, call in
+            try await provider.respond(to: call.prompt, instructions: call.instructions, history: call.history)
+        }
+    }
+
+    // MARK: Streaming (D16)
+
+    /// Streams a response through the same resolution-and-fallback chain as
+    /// `respond`. Fragments arrive as the provider produces them; a provider
+    /// without a native streaming path delivers its whole answer as one
+    /// fragment, so the caller writes a single loop either way.
+    ///
+    /// FALLBACK RULE (D16): automatic fallback applies only UNTIL the first
+    /// fragment reaches the caller. Once any text has been shown, a failure
+    /// surfaces as an error instead of silently re-answering with a different
+    /// model — visible text must never be retracted by the chain.
+    public func streamResponse(
+        to prompt: String,
+        instructions: String? = nil,
+        history: [ChatTurn] = [],
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
+    ) -> AsyncThrowingStream<String, Error> {
+        Self.textFragments(of: streamDetailed(
+            to: prompt, instructions: instructions, history: history, need: need, task: task
+        ))
+    }
+
+    /// Like `streamResponse`, but with provenance: a `.began` event names the
+    /// provider (and privacy level) right before its first fragment — the
+    /// streaming counterpart of `respondDetailed`.
+    public func streamDetailed(
+        to prompt: String,
+        instructions: String? = nil,
+        history: [ChatTurn] = [],
+        need: ModelNeed? = nil,
+        task: TaskRequirement? = nil
+    ) -> AsyncThrowingStream<AIStreamEvent, Error> {
+        makeStream(ChainRequest(
+            prompt: prompt, instructions: instructions, history: history,
+            need: need, task: task, mode: .raw, requirement: .plain, tools: []
+        )) { provider, call in
+            provider.streamResponse(to: call.prompt, instructions: call.instructions, history: call.history)
+        }
+    }
+
+    /// Drops provenance events, keeping only the text fragments.
+    static func textFragments(
+        of events: AsyncThrowingStream<AIStreamEvent, Error>
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await event in events {
+                        if case .text(let fragment) = event {
+                            continuation.yield(fragment)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Snapshots the actor state and runs the shared stream loop. `open`
+    /// starts the chosen provider's stream (capable or plain path).
+    func makeStream(
+        _ request: ChainRequest,
+        open: @escaping @Sendable (any ModelProvider, OutboundCall) -> AsyncThrowingStream<String, Error>
+    ) -> AsyncThrowingStream<AIStreamEvent, Error> {
+        // Snapshot the immutable actor state so the stream task never has to
+        // hop back onto the actor.
+        let providers = orderedProviders(for: request.need, task: request.task, mode: request.mode)
+        let disclosure = privacyDisclosure
+        let filter = outboundFilter
+        let reserve = responseTokenReserve
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                await Self.runStream(
+                    request,
+                    providers: providers,
+                    disclosure: disclosure,
+                    filter: filter,
+                    reserve: reserve,
+                    open: open,
+                    continuation: continuation
+                )
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// The streaming counterpart of the `respondDetailed` loop: same
+    /// availability skip, token pre-flight (D13), and privacy gate (D7/D10),
+    /// with the D16 first-fragment fallback rule at the end.
+    private static func runStream(
+        _ request: ChainRequest,
+        providers: [any ModelProvider],
+        disclosure: PrivacyDisclosure,
+        filter: OutboundFilter?,
+        reserve: Int,
+        open: @Sendable (any ModelProvider, OutboundCall) -> AsyncThrowingStream<String, Error>,
+        continuation: AsyncThrowingStream<AIStreamEvent, Error>.Continuation
+    ) async {
+        guard let first = providers.first else {
+            continuation.finish(throwing: ProviderError.noProviderAvailable)
+            return
+        }
+        let baseline = first.privacyLevel
+        var lastError: ProviderError = .noProviderAvailable
+
+        for provider in providers {
+            if Task.isCancelled {
+                continuation.finish(throwing: ProviderError.cancelled)
+                return
+            }
+            if let skip = await admit(
+                provider, baseline: baseline, disclosure: disclosure, reserve: reserve,
+                prompt: request.prompt, instructions: request.instructions, history: request.history,
+                requirement: request.requirement, tools: request.tools
+            ) {
+                record(skip, into: &lastError)
+                continue
+            }
+            guard let call = await outboundCall(request, for: provider, through: filter) else {
+                record(.privacyRestricted, into: &lastError)
+                continue
+            }
+
+            // D16 rule: fallback is legal only until the first fragment is
+            // out; after that, errors surface.
+            var emitted = false
+            do {
+                for try await fragment in open(provider, call) {
+                    if !emitted {
+                        emitted = true
+                        continuation.yield(.began(
+                            provider: provider.identifier,
+                            privacyLevel: provider.privacyLevel
+                        ))
+                    }
+                    continuation.yield(.text(fragment))
+                }
+                guard emitted else {
+                    // A stream that ends without fragments is an empty
+                    // response — terminal, like the buffered path.
+                    continuation.finish(throwing: ProviderError.emptyResponse)
+                    return
+                }
+                continuation.finish()
+                return
+            } catch {
+                let providerError = (error as? ProviderError)
+                    ?? (error is CancellationError
+                        ? .cancelled
+                        : .generation(String(describing: error)))
+                lastError = providerError
+                if !emitted, providerError.isRecoverableByFallback {
+                    continue        // try the next provider
+                }
+                continuation.finish(throwing: providerError)
+                return
+            }
+        }
+
+        continuation.finish(throwing: lastError)
+    }
+
+    // MARK: Admission (shared by every chain walk)
+
+    /// The gate every provider passes before a call is sent to it, in this
+    /// fixed order:
+    /// 1. skip unavailable providers (nothing recorded);
+    /// 2. capability: a `.requiresFoundationModels` call skips a provider
+    ///    that is not a `FoundationModelsCapableProvider`, recording
+    ///    `.capabilityUnavailable` — BEFORE the privacy gate, so the user is
+    ///    never asked about a provider that cannot serve the call;
+    /// 3. skip a provider whose known window cannot fit the call (D13
+    ///    pre-flight, as if it had thrown `.contextWindowExceeded`, without
+    ///    paying for a doomed generation — and BEFORE the privacy gate, for
+    ///    the same reason). A capable provider on a non-plain call is
+    ///    counted WITH the tool definitions;
+    /// 4. apply the privacy disclosure policy when the provider sits below
+    ///    the chain's baseline (D7/D10/D18).
+    ///
+    /// `requirement` and `tools` default to the plain call, which is exactly
+    /// the original three-step admission. `tools` is type-erased `[any Tool]`
+    /// because admission also serves the iOS 18-floor plain path, where
+    /// `Tool` doesn't exist.
+    ///
+    /// Returns `nil` when the provider is admitted; otherwise the error to
+    /// remember as the reason (`.some(nil)` = plain unavailability). Callers
+    /// record it with `record(_:into:)`. `CallRequirement`, `record` and the
+    /// tool-aware count live in `AIOrchestrator+ChainWalk.swift`.
+    static func admit(
+        _ provider: any ModelProvider,
+        baseline: PrivacyLevel,
+        disclosure: PrivacyDisclosure,
+        reserve: Int,
+        prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        requirement: CallRequirement = .plain,
+        tools: [any Sendable] = []
+    ) async -> ProviderError?? {
+        if case .unavailable = await provider.availability() {
+            return .some(nil)
+        }
+
+        let isCapable = isFoundationModelsCapable(provider)
+        if requirement == .requiresFoundationModels, !isCapable {
+            return .some(.capabilityUnavailable)
+        }
+
+        if let window = provider.contextSize,
+           let needed = await preflightTokenCount(
+               on: provider,
+               countingTools: requirement != .plain && isCapable ? tools : nil,
+               prompt: prompt, instructions: instructions, history: history
+           ),
+           needed + reserve >= window {
+            return .some(.contextWindowExceeded)
+        }
+
+        if provider.privacyLevel < baseline {
+            let downgrade = PrivacyDowngrade(
+                from: baseline,
+                to: provider.privacyLevel,
+                provider: provider.identifier
+            )
+            switch disclosure {
+            case .silent:
+                break
+            case .log:
+                logDowngrade(downgrade)
+            case .notify(let handler):
+                handler(downgrade)
+            case .askOnPrivacyChange(let handler):
+                guard await handler(downgrade) else {
+                    return .some(.privacyRestricted)
+                }
+            case .denyDowngrade:
+                return .some(.privacyRestricted)
+            }
+        }
+        return nil
+    }
+
+    // MARK: Resolution (the primitive, not the convenience)
+
+    /// Returns the first available provider in the chain WITHOUT executing
+    /// anything. This is the "model resolution" primitive — the framework's
+    /// core value. On iOS 27, `preferred()` builds on the same walk to return
+    /// a native `LanguageModel` for Dynamic Profiles (D1).
+    ///
+    /// Note: it applies availability only, not the interactive disclosure
+    /// (.askOnPrivacyChange only makes sense inside the `respond` loop).
+    /// With `.denyDowngrade`, providers below the threshold are excluded.
+    public func resolveProvider(
+        for need: ModelNeed? = nil,
+        task: TaskRequirement? = nil,
+        mode: MeasuredCapabilities.Mode = .raw
+    ) async throws -> any ModelProvider {
+        let providers = orderedProviders(for: need, task: task, mode: mode)
+        guard let first = providers.first else {
+            throw ProviderError.noProviderAvailable
+        }
+        let baseline = first.privacyLevel
+
+        for provider in providers {
+            if case .unavailable = await provider.availability() {
+                continue
+            }
+            if case .denyDowngrade = privacyDisclosure,
+               provider.privacyLevel < baseline {
+                continue
+            }
+            return provider
+        }
+        throw ProviderError.noProviderAvailable
+    }
+
+    /// The Dynamic Profiles bridge (D1): resolves the chain exactly like
+    /// `resolveProvider()` and returns the winning provider as a native
+    /// Apple `LanguageModel` — ready to drop into a `DynamicProfile`'s
+    /// `.model(...)` or a `LanguageModelSession(model:)`. The developer
+    /// writes the agent entirely in Apple's language; VoltaSDK contributes
+    /// one expression: which model.
+    ///
+    /// Resolution-time policy only, like `resolveProvider()`: availability
+    /// gates the walk and `.denyDowngrade` excludes lower-privacy providers,
+    /// but per-call disclosure does not travel with the returned model — the
+    /// consuming session/profile owns the calls (and their generation
+    /// options) from there. Providers that cannot express themselves as a
+    /// `LanguageModel` (custom `ModelProvider`s that don't adopt
+    /// `LanguageModelConvertible`) are skipped.
+    ///
+    /// The per-need form is the flagship (D1/D7):
+    /// `.model(orchestrator.preferred(.reasoning))` — the need reorders the
+    /// chain for this one resolution, then the same walk applies.
+    @available(iOS 27.0, macOS 27.0, *)
+    public func preferred(_ need: ModelNeed? = nil, task: TaskRequirement? = nil) async throws -> any LanguageModel {
+        let providers = orderedProviders(for: need, task: task, mode: .raw)
+        guard let first = providers.first else {
+            throw ProviderError.noProviderAvailable
+        }
+        let baseline = first.privacyLevel
+
+        for provider in providers {
+            if case .unavailable = await provider.availability() {
+                continue
+            }
+            if case .denyDowngrade = privacyDisclosure,
+               provider.privacyLevel < baseline {
+                continue
+            }
+            guard let convertible = provider as? any LanguageModelConvertible,
+                  let model = convertible.languageModel else {
+                continue
+            }
+            return model
+        }
+        throw ProviderError.noProviderAvailable
+    }
+
+    /// Pressure of the current conversation on the window of the provider
+    /// that would answer now (D13). `nil` if no provider is available or
+    /// the resolved one can't count (e.g. on-device before 26.4).
+    /// The app uses it to decide when to trim/summarize the history (D12).
+    public func contextUsage(
+        instructions: String? = nil,
+        history: [ChatTurn]
+    ) async -> ContextUsage? {
+        guard let provider = try? await resolveProvider(),
+              let window = provider.contextSize,
+              let tokens = await provider.tokenCount(
+                  prompt: "", instructions: instructions, history: history
+              )
+        else { return nil }
+        return ContextUsage(
+            tokens: tokens,
+            contextSize: window,
+            provider: provider.identifier
+        )
+    }
+
+    // MARK: Introspection (for UI and diagnostics)
+
+    /// The currently usable providers, in preference order.
+    public func availableProviders() async -> [ProviderIdentifier] {
+        var result: [ProviderIdentifier] = []
+        for provider in orderedProviders {
+            if case .available = await provider.availability() {
+                result.append(provider.identifier)
+            }
+        }
+        return result
+    }
+
+    /// Full status of every provider in the chain (including unavailable
+    /// ones, with the reason). Designed for picker/diagnostic UIs. Pass a
+    /// `need` to see the chain in the order that need would walk it (D7) —
+    /// the "what would happen" preview counterpart of `respond(need:)`.
+    /// By default the list ignores `enabledProviders`, so a picker can show
+    /// a switched-off provider and offer it back; pass
+    /// `honoringSelection: true` for the chain a call would actually walk
+    /// (the switched-off ones left out, empty when nothing is switched on).
+    public func providerStatuses(
+        for need: ModelNeed? = nil,
+        task: TaskRequirement? = nil,
+        mode: MeasuredCapabilities.Mode = .raw,
+        honoringSelection: Bool = false
+    ) async -> [ProviderStatus] {
+        var result: [ProviderStatus] = []
+        for provider in orderedProviders(for: need, task: task, mode: mode, honoringSelection: honoringSelection) {
+            result.append(ProviderStatus(
+                identifier: provider.identifier,
+                privacyLevel: provider.privacyLevel,
+                availability: await provider.availability(),
+                contextSize: provider.contextSize
+            ))
+        }
+        return result
+    }
+
+    // MARK: Per-need reordering (D7)
+
+    /// Reorders the configured chain for one call. Ranks are TIERS
+    /// (privacy levels double as capability/cost tiers); the sort is stable,
+    /// so within a tier the configured order still breaks ties — except for
+    /// `.largeContext`, where a larger known context window ranks first
+    /// within its tier (unknown windows rank last there: no pre-flight beats
+    /// a wrong pre-flight, D13).
+    /// The chain for one call: the user's switched-on providers
+    /// (`enabledProviders`, when set), reordered for the need (D7), then
+    /// filtered by the capability map for the task (D22). A provider that
+    /// measured below the task's floor is dropped for this call — and logged,
+    /// so a tier that never answers a feature is never a silent mystery.
+    /// `providerStatuses` passes `honoringSelection: false`: a switched-off
+    /// provider stays listed, so a picker can offer it back.
+    func orderedProviders(for need: ModelNeed?, task: TaskRequirement?, mode: MeasuredCapabilities.Mode, honoringSelection: Bool = true) -> [any ModelProvider] {
+        var ordered = orderedProviders(for: need)
+        if honoringSelection, let enabledProviders {
+            ordered = ordered.filter { enabledProviders.contains($0.identifier) }
+        }
+        guard let task, let capabilities else { return ordered }
+        return ordered.filter { provider in
+            let admitted = task.admits(provider, mode: mode, in: capabilities)
+            if !admitted { Self.logSkip(task: task, provider: provider, mode: mode, capabilities: capabilities) }
+            return admitted
+        }
+    }
+
+    /// Whether any provider in the chain may be tried for the task, given
+    /// the map — the app-level "can this feature exist here?" question.
+    /// Availability at the moment of the call is a separate matter.
+    public func canServe(_ task: TaskRequirement, need: ModelNeed? = nil, mode: MeasuredCapabilities.Mode = .raw) -> Bool {
+        !orderedProviders(for: need, task: task, mode: mode).isEmpty
+    }
+
+    func orderedProviders(for need: ModelNeed?) -> [any ModelProvider] {
+        guard let need else { return orderedProviders }
+
+        func tierRank(_ provider: any ModelProvider) -> Int {
+            switch need {
+            case .lightweight:
+                // Cost/privacy order: local → Apple cloud → external.
+                switch provider.privacyLevel {
+                case .onDevice: return 0
+                case .appleCloud: return 1
+                case .external: return 2
+                }
+            case .reasoning, .largeContext:
+                // Capability order: PCC (capable, free) → external (big
+                // models) → on-device as the last resort. For .largeContext
+                // this is the Sep 2026 D7 amendment: reliability over
+                // keeping long-context work local.
+                switch provider.privacyLevel {
+                case .appleCloud: return 0
+                case .external: return 1
+                case .onDevice: return 2
+                }
+            }
+        }
+
+        return orderedProviders.enumerated()
+            .sorted { a, b in
+                let rankA = tierRank(a.element), rankB = tierRank(b.element)
+                if rankA != rankB { return rankA < rankB }
+                if case .largeContext = need {
+                    let windowA = a.element.contextSize ?? 0
+                    let windowB = b.element.contextSize ?? 0
+                    if windowA != windowB { return windowA > windowB }
+                }
+                return a.offset < b.offset      // stable: configured order
+            }
+            .map(\.element)
+    }
+
+    // MARK: Privacy logging (D18)
+
+    private static let privacyLog = Logger(subsystem: "VoltaSDK", category: "privacy")
+
+    /// The `.log` disclosure policy (the default): a downgrade leaves a
+    /// developer-visible trace in the unified log — never silent, never UI.
+    static func logDowngrade(_ downgrade: PrivacyDowngrade) {
+        privacyLog.notice("Privacy downgrade: \(String(describing: downgrade.from), privacy: .public) → \(String(describing: downgrade.to), privacy: .public) via \(downgrade.provider.rawValue, privacy: .public)")
+    }
+
+    private static let capabilityLog = Logger(subsystem: "VoltaSDK", category: "capabilities")
+
+    static func logSkip(task: TaskRequirement, provider: any ModelProvider, mode: MeasuredCapabilities.Mode, capabilities: MeasuredCapabilities) {
+        let row = capabilities.measurement(task: task.id, provider: provider.identifier, mode: mode)
+        let rate = row.map { String(format: "%.0f%%", $0.passRate * 100) } ?? "?"
+        capabilityLog.notice("Skipping \(provider.identifier.rawValue, privacy: .public) for task \(task.id, privacy: .public): measured \(rate, privacy: .public) < floor \(String(format: "%.0f%%", task.minimumPassRate * 100), privacy: .public)")
+    }
+
+    // MARK: Provider construction
+
+    private static func buildProviders(from config: AIConfiguration) -> [any ModelProvider] {
+        // On-device requires the iOS 26 Foundation Models framework; below it
+        // the slot is simply absent and the chain is cloud-only (D19).
+        let onDevice: (any ModelProvider)? = {
+            guard config.enableOnDevice else { return nil }
+            if #available(iOS 26.0, macOS 26.0, *) {
+                return OnDeviceProvider(
+                    model: config.onDeviceModel,
+                    simulateUnavailable: config.simulateOnDeviceUnavailable
+                )
+            }
+            return nil
+        }()
+        let pcc = buildPrivateCloudComputeProvider(from: config)
+        let cloud = buildCloudProvider(from: config)
+        // User-account providers and vendor-shipped custom models (iOS 27) are
+        // additional options; they trail the app's own providers in the default
+        // order, and the user can re-lead the chain via the picker.
+        let userAccounts = buildUserAccountProviders(from: config)
+        let customModels = buildCustomModelProviders(from: config)
+
+        // Ordered by privacy: on-device (max) → PCC (.appleCloud) → developer
+        // key (external) → user accounts → custom models. PCC is a fallback
+        // tier, not a destination of its own, so it (and the iOS 27 extras)
+        // join the two "prefer" chains but not the strict "only" modes.
+        switch config.preference {
+        case .preferOnDevice:
+            return [onDevice, pcc, cloud].compactMap { $0 } + userAccounts + customModels
+        case .preferDeveloperKey:
+            return [cloud, pcc, onDevice].compactMap { $0 } + userAccounts + customModels
+        case .onDeviceOnly:
+            return [onDevice].compactMap { $0 }
+        case .developerKeyOnly:
+            return [cloud].compactMap { $0 }
+        }
+    }
+
+    /// Wraps each vendor-/app-supplied `LanguageModel` (iOS 27) into the chain
+    /// — the same single-gate pattern as the other iOS 27 tiers (D14).
+    static func buildCustomModelProviders(from config: AIConfiguration) -> [any ModelProvider] {
+        guard !config._customModels.isEmpty else { return [] }
+        if #available(iOS 27.0, macOS 27.0, *) {
+            return config.customModels.map { entry in
+                LanguageModelProvider(
+                    identifier: entry.identifier,
+                    privacyLevel: entry.privacyLevel,
+                    model: entry.model,
+                    connected: true
+                )
+            }
+        }
+        return []
+    }
+
+    /// Builds a chain provider for each configured user account. On iOS 27+
+    /// the account goes through the public `LanguageModel` front door
+    /// (`CloudAccountLanguageModel`), so it is also a native model for the
+    /// profiles bridge; below 27 the user's key drives the vendor REST client
+    /// directly (D19) — same transport as the developer key, billed to the
+    /// user.
+    static func buildUserAccountProviders(from config: AIConfiguration) -> [any ModelProvider] {
+        guard !config.userAccounts.isEmpty else { return [] }
+        if #available(iOS 27.0, macOS 27.0, *) {
+            return config.userAccounts.map { account in
+                LanguageModelProvider(
+                    identifier: .userAccount(account.vendor),
+                    privacyLevel: .external,
+                    model: CloudAccountLanguageModel(
+                        vendor: account.vendor,
+                        model: account.model,
+                        token: account.token
+                    ),
+                    connected: account.isConnected
+                )
+            }
+        }
+        return config.userAccounts.map { UserAccountRESTProvider(account: $0) }
+    }
+
+    /// Private Cloud Compute is the single iOS 27 wire-in point (D14): a
+    /// type-level `@available` gate here, nothing scattered through the
+    /// orchestration logic — the chain just gets one provider longer on iOS 27.
+    static func buildPrivateCloudComputeProvider(
+        from config: AIConfiguration
+    ) -> (any ModelProvider)? {
+        guard config.enablePrivateCloudCompute else { return nil }
+        if #available(iOS 27.0, macOS 27.0, *) {
+            return PrivateCloudComputeProvider(entitlement: config.privateCloudComputeEntitlement)
+        }
+        return nil
+    }
+
+    /// The developer key is vendor-agnostic (D15): explicit vendor wins,
+    /// otherwise it's detected from the key format, with OpenAI as the
+    /// documented fallback for unrecognized formats. The key is trimmed:
+    /// pasted keys routinely carry whitespace/newlines, which would break
+    /// both detection and the auth header.
+    /// Public so tooling (the evaluation engine) can build the same
+    /// developer-key provider the chain would, from a configuration.
+    public static func buildCloudProvider(from config: AIConfiguration) -> (any ModelProvider)? {
+        guard let key = config.developerKey?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !key.isEmpty else { return nil }
+        let vendor = config.developerKeyVendor ?? CloudVendor.detect(fromKey: key) ?? .openAI
+        let model = config.developerKeyModel ?? vendor.defaultModel
+
+        switch vendor {
+        case .openAI:
+            return OpenAIProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens,
+                temperature: config.temperature
+            )
+        case .anthropic:
+            // No temperature: recent Claude models reject sampling params.
+            return AnthropicProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens
+            )
+        case .gemini:
+            return GeminiProvider(
+                apiKey: key,
+                model: model,
+                maxTokens: config.maxTokens,
+                temperature: config.temperature
+            )
+        }
+    }
+}

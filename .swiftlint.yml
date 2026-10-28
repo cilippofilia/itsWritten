@@ -1,0 +1,2 @@
+excluded:
+  - Packages # vendored VoltaSDK, linted in its own repo

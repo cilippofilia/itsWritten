@@ -173,7 +173,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				7225408F94A3DE33FED69C64 /* XCRemoteSwiftPackageReference "PrivateAds" */,
-				18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "../VoltaSDK" */,
+				18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "Packages/VoltaSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 18A488EF2E68BD5F00A87380 /* Products */;
@@ -551,9 +551,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "../VoltaSDK" */ = {
+		18E5B2E630843AA400F697FF /* XCLocalSwiftPackageReference "Packages/VoltaSDK" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../VoltaSDK;
+			relativePath = Packages/VoltaSDK;
 		};
 /* End XCLocalSwiftPackageReference section */
 

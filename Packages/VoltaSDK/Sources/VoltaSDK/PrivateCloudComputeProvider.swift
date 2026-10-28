@@ -1,0 +1,383 @@
+//
+//  PrivateCloudComputeProvider.swift
+//  VoltaSDK
+//
+//  Private Cloud Compute (iOS 27): a large, Apple-hosted model that integrates
+//  like the on-device one — no key, no account — but runs in Apple's Private
+//  Cloud Compute. It is the "free powered" tier (design decision D6): free for
+//  the developer (apps under 2M downloads, with the PCC entitlement), with a
+//  per-user DAILY QUOTA that can run out mid-use.
+//
+//  Two consequences shape this provider:
+//   - Privacy is `.appleCloud`: above an external vendor, below on-device.
+//     Reaching it during fallback is a privacy downgrade and goes through the
+//     normal disclosure policy (D7/D10).
+//   - Quota is the main reason fallback must be RUNTIME, not a static setup
+//     choice. iOS 27 exposes the remaining quota PROACTIVELY
+//     (`quotaUsage`/`isLimitReached`), so `availability()` can skip an
+//     exhausted PCC before paying for a doomed call, AND it surfaces a
+//     distinct `.quotaLimitReached` error if the quota runs out mid-call —
+//     mapped to a recoverable `.rateLimited` so the chain steps down.
+//
+//  iOS 27 only: gated `@available` at the type level (D14). On iOS 26 the
+//  type does not exist and `buildProviders` simply never creates it.
+//
+
+import Foundation
+import FoundationModels
+import Security
+
+/// How `PrivateCloudComputeProvider` learns whether the process carries the
+/// PCC entitlement (a wrong "yes" traps at the first call; a wrong "no"
+/// silently skips a free tier).
+public enum PrivateCloudComputeEntitlement: Sendable, Equatable {
+    /// Read it from the code signature: `SecTask` on macOS, the signed
+    /// entitlements embedded in the executable on iOS (every signed build,
+    /// App Store included); the embedded provisioning profile only when the
+    /// executable carries no readable entitlements at all.
+    case detect
+    /// The app is signed with the entitlement (the App Store case on iOS).
+    case granted
+    /// Never use PCC in this process.
+    case absent
+}
+
+@available(iOS 27.0, macOS 27.0, *)
+public struct PrivateCloudComputeProvider: ModelProvider {
+
+    public let identifier = ProviderIdentifier.privateCloudCompute
+    public let privacyLevel = PrivacyLevel.appleCloud
+
+    /// The Apple-granted entitlement a process must carry to call PCC. Without
+    /// it the framework **traps** (a fatal error, not a catchable Swift error)
+    /// on the first generation — see the comment on `availability()`.
+    public static let requiredEntitlement = "com.apple.developer.private-cloud-compute"
+
+    /// One model instance — but ONLY in an entitled process (`nil` otherwise).
+    ///
+    /// The entitlement gate lives at CONSTRUCTION, not just at the call sites.
+    /// Observed on macOS 27 (beta 27A5209h), in a long-running unentitled app:
+    /// merely instantiating `PrivateCloudComputeLanguageModel` spins up
+    /// background status machinery ("Failed to check usage limit status",
+    /// "establishment of session failed with Missing entitlement") that
+    /// eventually TRAPS on a background thread (EXC_BREAKPOINT) — a crash no
+    /// call-site guard can intercept, because our code isn't on the stack.
+    /// The entitlement is baked into the code signature and cannot change at
+    /// runtime, so deciding once at init is sound: unentitled → never create
+    /// the model → the provider reports unavailable and the chain skips it.
+    private let model: PrivateCloudComputeLanguageModel?
+
+    /// Warm-session reuse (D17) — see `SessionCache`.
+    private let sessionCache = SessionCache()
+
+    public init() {
+        self.init(entitlement: .detect)
+    }
+
+    /// `entitlement` says how the provider decides whether the process may
+    /// call PCC: `.detect` (default) reads the code signature / provisioning
+    /// profile; `.granted` / `.absent` state it outright — needed on iOS for
+    /// App Store builds, which carry no provisioning profile to read (see
+    /// `hasRequiredEntitlement`).
+    public init(entitlement: PrivateCloudComputeEntitlement) {
+        let entitled: Bool
+        switch entitlement {
+        case .detect: entitled = Self.hasRequiredEntitlement()
+        case .granted: entitled = true
+        case .absent: entitled = false
+        }
+        self.model = entitled ? PrivateCloudComputeLanguageModel() : nil
+    }
+
+    public func availability() async -> ProviderAvailability {
+        // Entitlement gate (decided at init — see `model`). Also verified: an
+        // unentitled process does NOT see `model.availability` change — it
+        // still reports `.available` — but the first `respond` traps with
+        //   "Process is missing required entitlement: com.apple.developer.private-cloud-compute"
+        // a fatal error `do/catch` cannot intercept. Since PCC is default-on,
+        // the missing entitlement must degrade to a graceful skip, never a call.
+        guard let model else {
+            return .unavailable(reason: "Missing the \(Self.requiredEntitlement) entitlement")
+        }
+        switch model.availability {
+        case .available:
+            // Proactive quota pre-check (Q1, answered by the iOS 27 SDK):
+            // an exhausted daily quota makes PCC effectively unavailable until
+            // its reset, so the chain skips it without a doomed round-trip.
+            if model.quotaUsage.isLimitReached {
+                return .unavailable(reason: Self.quotaReason(model.quotaUsage))
+            }
+            return .available
+        case .unavailable(let reason):
+            return .unavailable(reason: Self.describe(reason))
+        @unknown default:
+            return .unavailable(reason: "Private Cloud Compute unavailable")
+        }
+    }
+
+    /// Whether the running process is signed with the PCC entitlement.
+    /// Returns false when absent (the common case), so the provider skips
+    /// itself rather than trapping.
+    ///
+    /// - macOS: the binary's own entitlements via `SecTask` (public API, no
+    ///   special permission).
+    /// - iOS: `SecTask` is not in the public SDK (found the hard way — the
+    ///   package did not compile for a physical iPhone until Sep 2026). The
+    ///   signed entitlements are read out of the executable instead: the code
+    ///   signature embeds them as an XML plist, in every signed build, App
+    ///   Store builds included. Only when the executable carries no readable
+    ///   entitlements at all is the embedded provisioning profile consulted
+    ///   (development, ad-hoc and enterprise builds carry one). The profile
+    ///   alone is not trusted: it says what the App ID MAY carry, and a build
+    ///   signed without the key while the profile grants it trapped at the
+    ///   first call (an adopter's regenerated project, Oct 1, 2026).
+    public static func hasRequiredEntitlement() -> Bool {
+        #if os(macOS)
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        let value = SecTaskCopyValueForEntitlement(task, requiredEntitlement as CFString, nil)
+        if let flag = value as? Bool { return flag }
+        return value != nil
+        #else
+        if let signed = signedEntitlementsGrantEntitlement() { return signed }
+        return provisioningProfileGrantsEntitlement()
+        #endif
+    }
+
+    /// Whether the executable's code signature carries the entitlement set to
+    /// true; nil when no signed entitlements can be read (no executable, or a
+    /// signature with no XML entitlements blob), so the caller can fall back.
+    static func signedEntitlementsGrantEntitlement() -> Bool? {
+        guard let url = Bundle.main.executableURL,
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+        return signedEntitlements(in: data, grant: requiredEntitlement)
+    }
+
+    /// Scans a signed Mach-O image for its XML entitlements and reads one key.
+    /// The signature's entitlements blob is the plist as text, so the key
+    /// appears as `<key>NAME</key>` followed by `<true/>`. Returns nil when
+    /// the image has no entitlements plist at all (`application-identifier`,
+    /// which every signed iOS app carries, is the sentinel), false when the
+    /// plist is there and the key is not true.
+    static func signedEntitlements(in data: Data, grant key: String) -> Bool? {
+        // Built at run time so the needles are not themselves string literals in the image.
+        let open = String(["<", "k", "e", "y", ">"]), close = String(["<", "/", "k", "e", "y", ">"])
+        let sentinel = Data((open + "application-identifier" + close).utf8)
+        guard data.range(of: sentinel) != nil else { return nil }
+        let needle = Data((open + key + close).utf8)
+        var search = data.startIndex
+        while let found = data.range(of: needle, in: search..<data.endIndex) {
+            let tail = data[found.upperBound..<min(found.upperBound + 32, data.endIndex)]
+            let text = String(decoding: tail, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.hasPrefix(String(["<", "t", "r", "u", "e", "/", ">"])) { return true }
+            search = found.upperBound
+        }
+        return false
+    }
+
+    /// Reads `embedded.mobileprovision` (a CMS envelope around a plist; the
+    /// plist is embedded as plain text) and looks for the entitlement key set
+    /// to true. Missing profile or key → false.
+    static func provisioningProfileGrantsEntitlement() -> Bool {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .isoLatin1),
+              let start = text.range(of: "<?xml"),
+              let end = text.range(of: "</plist>", range: start.upperBound..<text.endIndex) else {
+            return false
+        }
+        let plist = String(text[start.lowerBound..<end.upperBound])
+        guard let plistData = plist.data(using: .utf8),
+              let object = try? PropertyListSerialization.propertyList(from: plistData, format: nil),
+              let root = object as? [String: Any],
+              let entitlements = root["Entitlements"] as? [String: Any] else {
+            return false
+        }
+        if let flag = entitlements[requiredEntitlement] as? Bool { return flag }
+        return entitlements[requiredEntitlement] != nil
+    }
+
+    public func respond(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) async throws -> String {
+        // Unentitled process → the model was never created (see `model`).
+        // Recoverable: the chain moves on. (The orchestrator won't normally
+        // reach here — availability() already reported unavailable — but a
+        // direct caller must not trap either.)
+        guard let model else { throw ProviderError.noProviderAvailable }
+
+        // Warm-session reuse (D17), else rebuilt from the app-supplied
+        // history (D12) so PCC sees the conversation as its own — the same
+        // shape the on-device provider uses.
+        let session = sessionCache.checkOut(instructions: instructions, history: history, toolNames: [])
+            ?? Self.makeSession(model: model, instructions: instructions, history: history)
+
+        do {
+            let response = try await session.respond(to: prompt)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(response.content)],
+                toolNames: []
+            )
+            return response.content
+        } catch let error as PrivateCloudComputeLanguageModel.Error {
+            throw Self.map(error)
+        } catch let error as LanguageModelError {
+            throw ProviderError(error)               // shared mapping
+        } catch is CancellationError {
+            throw ProviderError.cancelled
+        } catch {
+            throw ProviderError.generation(String(describing: error))
+        }
+    }
+
+    // MARK: Structured output (D21) — guided generation
+
+    /// Constrained decoding on PCC, same shape as on-device; same
+    /// entitlement guard and error mapping as the buffered path.
+    public var supportsNativeStructuredOutput: Bool { true }
+
+    public func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn],
+        schema: OutputSchema
+    ) async throws -> String {
+        guard let model else { throw ProviderError.noProviderAvailable }
+        let session = sessionCache.checkOut(instructions: instructions, history: history, toolNames: [])
+            ?? Self.makeSession(model: model, instructions: instructions, history: history)
+        do {
+            let json = try await GuidedGeneration.respond(session: session, prompt: prompt, schema: schema)
+            sessionCache.checkIn(
+                session,
+                instructions: instructions,
+                history: history + [.user(prompt), .assistant(json)],
+                toolNames: []
+            )
+            return json
+        } catch let error as PrivateCloudComputeLanguageModel.Error {
+            throw Self.map(error)
+        } catch let error as LanguageModelError {
+            throw ProviderError(error)
+        } catch is CancellationError {
+            throw ProviderError.cancelled
+        } catch {
+            throw ProviderError.generation(String(describing: error))
+        }
+    }
+
+    // MARK: Streaming (D16)
+
+    /// Native token streaming via the session's `streamResponse` (shared
+    /// helper: cumulative snapshots → deltas). Same entitlement guard and
+    /// error mapping as the buffered path.
+    public func streamResponse(
+        to prompt: String,
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> AsyncThrowingStream<String, Error> {
+        guard let model else { return SessionStreaming.failing(.noProviderAvailable) }
+        return SessionStreaming.stream(
+            prompt: prompt,
+            instructions: instructions,
+            history: history,
+            toolNames: [],
+            cache: sessionCache,
+            makeSession: { Self.makeSession(model: model, instructions: instructions, history: history) },
+            mapError: { error in
+                if let pcc = error as? PrivateCloudComputeLanguageModel.Error {
+                    return Self.map(pcc)
+                }
+                if let framework = error as? LanguageModelError {
+                    return ProviderError(framework)
+                }
+                if error is CancellationError { return ProviderError.cancelled }
+                return ProviderError.generation(String(describing: error))
+            }
+        )
+    }
+
+    /// Session construction shared by `respond` and `streamResponse` (D12:
+    /// stateless per call, app-supplied history rebuilt as a Transcript).
+    private static func makeSession(
+        model: PrivateCloudComputeLanguageModel,
+        instructions: String?,
+        history: [ChatTurn]
+    ) -> LanguageModelSession {
+        guard !history.isEmpty else {
+            return LanguageModelSession(model: model, instructions: instructions)
+        }
+        let entries = FoundationModelsTranscript.entries(
+            instructions: instructions, history: history
+        )
+        return LanguageModelSession(model: model, transcript: Transcript(entries: entries))
+    }
+
+    // MARK: Token awareness (D13)
+    //
+    // PCC exposes `contextSize` as `async throws`, which does not fit the
+    // synchronous `ModelProvider.contextSize` surface (D13 assumed a cheap
+    // synchronous read, true for the on-device model). Rather than block on it,
+    // PCC opts out of the proactive pre-flight and relies on the reactive
+    // `.contextWindowExceeded` path (consistent with D7: the crossing is driven
+    // by measured overflow). Generalizing D13 to an async context read is a
+    // tracked follow-up. Until then `contextSize`/`tokenCount` stay `nil` (the
+    // protocol defaults).
+
+    // MARK: Error mapping
+
+    /// Maps PCC-specific errors. The whole point of PCC's distinct error enum
+    /// (Q2/Q4, answered by the SDK) is that quota exhaustion is separable from
+    /// a transient outage:
+    ///  - `.quotaLimitReached` → recoverable `.rateLimited`; `resetDate` (Q3)
+    ///    becomes `retryAfter` so the chain (and UI) know when PCC returns.
+    ///  - `.serviceUnavailable` / `.networkFailure` → recoverable network class:
+    ///    PCC is temporarily down, not the user's quota — still worth falling
+    ///    through, but it is not a quota event.
+    static func map(_ error: PrivateCloudComputeLanguageModel.Error) -> ProviderError {
+        switch error {
+        case .quotaLimitReached(let info):
+            return .rateLimited(retryAfter: info.resetDate.map { $0.timeIntervalSinceNow })
+        case .serviceUnavailable:
+            return .network(code: -1)
+        case .networkFailure:
+            return .network(code: -1)
+        @unknown default:
+            return .generation(String(describing: error))
+        }
+    }
+
+    private static func describe(
+        _ reason: PrivateCloudComputeLanguageModel.Availability.UnavailableReason
+    ) -> String {
+        switch reason {
+        case .deviceNotEligible:
+            return "This device does not support Private Cloud Compute"
+        case .systemNotReady:
+            return "Private Cloud Compute is not ready yet"
+        @unknown default:
+            return "Private Cloud Compute unavailable"
+        }
+    }
+
+    private static func quotaReason(
+        _ usage: PrivateCloudComputeLanguageModel.QuotaUsage
+    ) -> String {
+        if let reset = usage.resetDate {
+            return "Private Cloud Compute daily quota reached (resets \(reset))"
+        }
+        return "Private Cloud Compute daily quota reached"
+    }
+}
+
+// MARK: - Dynamic Profiles bridge (D1)
+
+@available(iOS 27.0, macOS 27.0, *)
+extension PrivateCloudComputeProvider: LanguageModelConvertible {
+    /// `nil` in an unentitled process — the model is never created there
+    /// (see `model`), so the bridge skips PCC instead of handing a Dynamic
+    /// Profile a model that would trap.
+    public var languageModel: (any LanguageModel)? { model }
+}
