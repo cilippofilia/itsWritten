@@ -29,7 +29,10 @@ struct OnboardingView: View {
         ),
         .init(
             title: "Guided, not prescriptive",
-            detail: "Insights are framed as possibilities to explore, never as instructions.",
+            detail: """
+                Insights are framed as possibilities to explore, never as instructions. itsWritten isn’t \
+                medical advice; for health concerns, talk to a doctor or another professional.
+                """,
             systemImage: "sparkles",
             accent: .pink
         ),

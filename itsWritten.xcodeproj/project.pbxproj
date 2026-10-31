@@ -290,7 +290,7 @@
 				DEVELOPMENT_TEAM = 3K3GFX53DY;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -354,7 +354,7 @@
 				DEVELOPMENT_TEAM = 3K3GFX53DY;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -562,8 +562,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/cilippofilia/PrivateAds.git";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = ca0bfc441c8a49e4440d0ac466a0109b2ebb9093;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

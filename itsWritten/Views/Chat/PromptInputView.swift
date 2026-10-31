@@ -20,6 +20,28 @@ struct PromptInputView: View {
     let onSubmit: () -> Void
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Kept on screen for App Review guideline 1.4.1 (medical apps).
+            Text("AI can make mistakes. Not medical advice.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            PromptFieldView(text: $text, placeholder: placeholder, isDisabled: isDisabled, onSubmit: onSubmit)
+        }
+        .padding(.bottom, DesignConstants.Spacing.small)
+    }
+}
+
+/// The text field and send button inside a glass capsule.
+@available(iOS 26.0, *)
+private struct PromptFieldView: View {
+    @Binding var text: String
+
+    let placeholder: String
+    let isDisabled: Bool
+    let onSubmit: () -> Void
+
+    var body: some View {
         HStack(spacing: 12) {
             TextField(placeholder, text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
@@ -40,7 +62,7 @@ struct PromptInputView: View {
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .capsule)
         .padding(.horizontal)
-        .padding(.vertical, DesignConstants.Spacing.small)
+        .padding(.top, DesignConstants.Spacing.small)
         .readableContentWidth()
     }
 }
