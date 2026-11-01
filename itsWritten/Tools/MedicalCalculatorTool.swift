@@ -8,7 +8,6 @@
 import Foundation
 import FoundationModels
 
-@available(iOS 26.0, *)
 struct MedicalCalculatorTool: Tool {
     let name = "medical_calculator"
     let description = "Compute clinical scores: BMI, eGFR, Framingham 10-year risk, QTc, and CHA2DS2-VASc."
@@ -92,7 +91,6 @@ struct MedicalCalculatorTool: Tool {
 
 // MARK: - BMI
 
-@available(iOS 26.0, *)
 private extension MedicalCalculatorTool {
     static func bmi(arguments: Arguments) throws -> String {
         guard let weight = arguments.weightKg, let height = arguments.heightCm else {
@@ -118,7 +116,6 @@ private extension MedicalCalculatorTool {
 
 // MARK: - eGFR (CKD-EPI 2021, race-free)
 
-@available(iOS 26.0, *)
 private extension MedicalCalculatorTool {
     static func egfr(arguments: Arguments) throws -> String {
         guard let scr = arguments.creatinineMgDl,
@@ -157,7 +154,6 @@ private extension MedicalCalculatorTool {
 
 // MARK: - Framingham 10-Year CHD Risk (NCEP ATP III)
 
-@available(iOS 26.0, *)
 private extension MedicalCalculatorTool {
     static func framingham(arguments: Arguments) throws -> String {
         guard let age = arguments.age,
@@ -282,7 +278,6 @@ private extension MedicalCalculatorTool {
 
 // MARK: - QTc
 
-@available(iOS 26.0, *)
 private extension MedicalCalculatorTool {
     static func qtc(arguments: Arguments) throws -> String {
         guard let qtMs = arguments.qtIntervalMs, let rrMs = arguments.rrIntervalMs else {
@@ -314,7 +309,6 @@ private extension MedicalCalculatorTool {
 
 // MARK: - CHA₂DS₂-VASc
 
-@available(iOS 26.0, *)
 private extension MedicalCalculatorTool {
     static func chadsvasc(arguments: Arguments) throws -> String {
         guard let age = arguments.age, let sex = arguments.sex else {

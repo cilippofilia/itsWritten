@@ -9,7 +9,6 @@ import VoltaSDK
 
 /// Debug only: forces fallback past the on-device model and shows what each
 /// provider in the chain reports, e.g. whether PCC has its entitlement.
-@available(iOS 26.0, *)
 struct DebugFallbackSection: View {
     @Environment(AIProviderStore.self) private var aiProvider
     @State private var statuses: [ProviderStatus] = []
@@ -42,7 +41,6 @@ struct DebugFallbackSection: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Form {
         DebugFallbackSection()

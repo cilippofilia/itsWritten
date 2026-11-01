@@ -9,7 +9,6 @@ import XCTest
 
 /// Vendor consent through the outbound filter: redaction, the review sheet's
 /// state, and restoring replies.
-@available(iOS 26.0, *)
 @MainActor
 final class CloudConsentReviewTests: XCTestCase {
     private var suiteName = ""

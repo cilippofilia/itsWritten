@@ -8,7 +8,6 @@ import SwiftUI
 /// Decorative "no ads" badge shown at the top of the Remove Ads paywall. It scales with
 /// Dynamic Type and is hidden from VoiceOver because the paywall title already says
 /// "Remove Ads".
-@available(iOS 26.0, *)
 struct RemoveAdsBadge: View {
     var body: some View {
         ZStack {
@@ -25,7 +24,6 @@ struct RemoveAdsBadge: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     RemoveAdsBadge()
 }

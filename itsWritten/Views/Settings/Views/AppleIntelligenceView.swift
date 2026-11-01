@@ -8,7 +8,6 @@
 import FoundationModels
 import SwiftUI
 
-@available(iOS 26.0, *)
 /// The on-device model and the languages it supports.
 struct AppleIntelligenceView: View {
     @Environment(\.locale) private var locale
@@ -77,7 +76,6 @@ struct AppleIntelligenceView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         AppleIntelligenceView()

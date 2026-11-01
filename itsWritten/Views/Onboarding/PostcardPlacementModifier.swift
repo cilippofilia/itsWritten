@@ -10,7 +10,6 @@ import SwiftUI
 /// Positions a postcard in the onboarding deck. Waiting cards sit lower and smaller so their
 /// edges peek out below the current one; sent cards fly off to the leading side and fade.
 /// Reduce Motion keeps sent cards in place and only fades them.
-@available(iOS 26.0, *)
 struct PostcardPlacementModifier: ViewModifier {
     let placement: PostcardPlacement
 

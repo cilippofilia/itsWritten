@@ -10,7 +10,6 @@ import SwiftUI
 /// A mask that makes printed ink look hand-stamped: scattered specks where the ink didn't
 /// take, and a few broad patches where it ran thin. The same `seed` always produces the
 /// same wear, so the mark doesn't flicker as the letter animates.
-@available(iOS 26.0, *)
 struct InkWearMask: View {
     let seed: UInt64
 
@@ -52,7 +51,6 @@ struct InkWearMask: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Rectangle()
         .fill(.red)

@@ -10,7 +10,6 @@ import XCTest
 
 /// End to end through `ConversationViewModel` and a real orchestrator: a vendor
 /// only ever receives placeholders, and the user only ever reads real words.
-@available(iOS 26.0, *)
 @MainActor
 final class CloudRedactionConversationTests: ConversationViewModelTestCase {
     private static let prompt = "Write a note to marta@example.com about the trip"

@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct ModelSettingsSheet: View {
     @Binding var configuration: ModelConfiguration
     @Binding var responseType: ModelResponseType
@@ -73,7 +72,6 @@ struct ModelSettingsSheet: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     NavigationStack {
         ModelSettingsSheet(

@@ -9,7 +9,6 @@ import SwiftUI
 
 /// The app menu in `HomeView`'s toolbar. A plain system `Menu` with a title and symbol,
 /// so the toolbar supplies its glass, overflow, and vertical-bar placement.
-@available(iOS 26.0, *)
 struct MenuButtonView: View {
     let showWhyAI: () -> Void
     let showOnboarding: () -> Void
@@ -33,7 +32,6 @@ struct MenuButtonView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     MenuButtonView(
         showWhyAI: { },

@@ -12,7 +12,6 @@ import XCTest
 
 /// Failure handling: guardrail retries, blocked turns, on-device compaction,
 /// rejected cloud keys and title generation.
-@available(iOS 26.0, *)
 @MainActor
 final class ConversationRecoveryTests: ConversationViewModelTestCase {
     func testTitleDeclinedKeepsPlaceholder() async throws {

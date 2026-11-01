@@ -8,7 +8,6 @@
 import SwiftUI
 
 /// A thin bar under the title showing how far through the onboarding cards the reader is.
-@available(iOS 26.0, *)
 struct OnboardingProgressView: View {
     /// The card being read, counting from 1.
     let current: Int
@@ -23,7 +22,6 @@ struct OnboardingProgressView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     OnboardingProgressView(current: 2, total: 4)
         .padding()

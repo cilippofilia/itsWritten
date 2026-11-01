@@ -47,7 +47,6 @@ struct PerforatedStampShape: Shape {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     PerforatedStampShape()
         .fill(.orange)

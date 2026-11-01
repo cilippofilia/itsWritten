@@ -8,7 +8,6 @@
 import SwiftUI
 
 /// Content for each `SheetType` presented from `HomeView`.
-@available(iOS 26.0, *)
 struct HomeSheetView: View {
     let sheet: SheetType
 

@@ -9,7 +9,6 @@ import SwiftUI
 
 /// The stamp as it lands on the folded letter: it drops in from slightly larger and
 /// transparent, then the postmark fades in over its leading edge.
-@available(iOS 26.0, *)
 struct PostedStampView: View {
     /// 0 = not yet stamped; 1 = stamped and postmarked.
     let progress: Double
@@ -30,7 +29,6 @@ struct PostedStampView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     PostedStampView(progress: 1, ink: .red, wearSeed: 7)
         .padding(40)

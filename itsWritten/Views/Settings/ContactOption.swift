@@ -7,7 +7,6 @@
 
 import Foundation
 
-@available(iOS 26.0, *)
 enum ContactOption: String, CaseIterable, Identifiable {
     case reportBug
     case requestFeature

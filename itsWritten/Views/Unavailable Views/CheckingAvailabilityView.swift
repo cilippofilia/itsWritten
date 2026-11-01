@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct CheckingAvailabilityView: View {
     var body: some View {
         VStack(spacing: 20) {
@@ -27,7 +26,6 @@ struct CheckingAvailabilityView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     CheckingAvailabilityView()
 }

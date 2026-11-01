@@ -9,7 +9,6 @@ import SwiftUI
 
 /// A round glass control for the running timer. Shows only its symbol, but keeps its
 /// title for VoiceOver and Voice Control.
-@available(iOS 26.0, *)
 struct TimerControlButton: View {
     let title: LocalizedStringKey
     let systemImage: String
@@ -29,7 +28,6 @@ struct TimerControlButton: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     TimerControlButton(title: "Pause Timer", systemImage: "pause.circle", action: {})
 }

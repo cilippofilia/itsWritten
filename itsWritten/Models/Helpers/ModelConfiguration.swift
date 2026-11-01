@@ -62,7 +62,6 @@ struct ModelConfiguration: Equatable {
     var topP: Double = 0.5
 
     /// Computed generation options based on current settings.
-    @available(iOS 26.0, *)
     var generationOptions: GenerationOptions {
         switch samplingType {
         case .greedy:

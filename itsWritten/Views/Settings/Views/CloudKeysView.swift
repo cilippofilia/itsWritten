@@ -6,7 +6,6 @@
 import SwiftUI
 
 /// `CloudModelsView` presented on its own, e.g. from the unavailable screen.
-@available(iOS 26.0, *)
 struct CloudKeysView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -22,7 +21,6 @@ struct CloudKeysView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     CloudKeysView()
         .environment(AIProviderStore())

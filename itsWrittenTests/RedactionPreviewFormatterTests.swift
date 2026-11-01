@@ -7,7 +7,6 @@ import SwiftUI
 import XCTest
 @testable import itsWritten
 
-@available(iOS 26.0, *)
 final class RedactionPreviewFormatterTests: XCTestCase {
     func testToggleURLRoundTrips() throws {
         let url = try XCTUnwrap(RedactionPreviewFormatter.toggleURL(for: "[PERSON_1]"))

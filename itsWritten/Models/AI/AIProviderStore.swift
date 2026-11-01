@@ -120,9 +120,7 @@ final class AIProviderStore {
     ) -> AIConfiguration {
         var configuration = AIConfiguration()
         configuration.enableOnDevice = true
-        if #available(iOS 26.0, *) {
-            configuration.onDeviceModel = AppLanguageModel.model
-        }
+        configuration.onDeviceModel = AppLanguageModel.model
         configuration.simulateOnDeviceUnavailable = simulateOnDeviceUnavailable
         configuration.enablePrivateCloudCompute = true
         configuration.preference = .preferOnDevice

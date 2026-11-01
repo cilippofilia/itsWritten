@@ -11,7 +11,6 @@ import SwiftUI
 ///
 /// This view provides a text field with automatic vertical expansion and a circular
 /// send button that becomes disabled when the input is empty or the view is disabled.
-@available(iOS 26.0, *)
 struct PromptInputView: View {
     @Binding var text: String
 
@@ -33,7 +32,6 @@ struct PromptInputView: View {
 }
 
 /// The text field and send button inside a glass capsule.
-@available(iOS 26.0, *)
 private struct PromptFieldView: View {
     @Binding var text: String
 
@@ -68,7 +66,6 @@ private struct PromptFieldView: View {
 }
 
 #if DEBUG
-@available(iOS 26.0, *)
 private struct PromptInputPreviewWrapper: View {
     @State private var text = "Txt"
 
@@ -85,12 +82,10 @@ private struct PromptInputPreviewWrapper: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview("Dark") {
     PromptInputPreviewWrapper(colorScheme: .dark)
 }
 
-@available(iOS 26.0, *)
 #Preview("Light") {
     PromptInputPreviewWrapper(colorScheme: .light)
 }

@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct AINotEnabledView: View {
     @Environment(\.openURL) private var openURL
     @State private var showWhyAISheet: Bool = false
@@ -62,7 +61,6 @@ struct AINotEnabledView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     AINotEnabledView()
         .environment(AIProviderStore())

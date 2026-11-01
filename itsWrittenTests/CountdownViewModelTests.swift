@@ -8,7 +8,6 @@
 import XCTest
 @testable import itsWritten
 
-@available(iOS 26.0, *)
 @MainActor
 final class CountdownViewModelTests: XCTestCase {
     func testStartTimerSetsState() {

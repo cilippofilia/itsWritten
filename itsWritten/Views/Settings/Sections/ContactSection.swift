@@ -10,7 +10,6 @@ import MessageUI
 #endif
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct ContactSection: View {
     @Environment(\.openURL) private var openURL
     @Environment(RemoveAdsStore.self) private var removeAdsStore
@@ -94,7 +93,6 @@ struct ContactSection: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Form {
         ContactSection()

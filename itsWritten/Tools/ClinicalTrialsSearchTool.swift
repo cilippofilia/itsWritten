@@ -8,7 +8,6 @@
 import Foundation
 import FoundationModels
 
-@available(iOS 26.0, *)
 struct ClinicalTrialsSearchTool: Tool {
     let name = "clinicaltrials_search"
     let description = "Search ClinicalTrials.gov for ongoing and completed clinical trials on a medical topic."

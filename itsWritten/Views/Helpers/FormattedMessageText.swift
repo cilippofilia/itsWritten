@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct FormattedMessageText: View {
     let text: String
 
@@ -57,7 +56,6 @@ struct FormattedMessageText: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     VStack(alignment: .leading, spacing: 12) {
         FormattedMessageText(text: "1. **Empathetic Engagement**\n- Use bold and lists.")

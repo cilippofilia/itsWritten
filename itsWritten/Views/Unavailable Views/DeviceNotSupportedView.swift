@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct DeviceNotSupportedView: View {
     @State private var showWhyAISheet: Bool = false
 
@@ -77,7 +76,6 @@ struct DeviceNotSupportedView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     DeviceNotSupportedView()
         .environment(AIProviderStore())

@@ -7,7 +7,6 @@ import VoltaSDK
 import XCTest
 @testable import itsWritten
 
-@available(iOS 26.0, *)
 final class KeychainAPIKeyStoreTests: XCTestCase {
     private var store = KeychainAPIKeyStore(service: "itsWrittenTests.\(UUID())")
 

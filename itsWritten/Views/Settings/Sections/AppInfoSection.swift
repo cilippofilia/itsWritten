@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct AppInfoSection: View {
     private let bundleIdentifier = Bundle.main.bundleIdentifier
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -27,7 +26,6 @@ struct AppInfoSection: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Form {
         AppInfoSection()

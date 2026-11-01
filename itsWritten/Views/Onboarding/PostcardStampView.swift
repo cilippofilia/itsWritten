@@ -9,7 +9,6 @@ import SwiftUI
 
 /// A perforated stamp bearing an onboarding step's symbol on a wash of its accent color.
 /// The paper stays white so the stamp reads on both light and dark postcards.
-@available(iOS 26.0, *)
 struct PostcardStampView: View {
     let step: OnboardingStep
 
@@ -36,7 +35,6 @@ struct PostcardStampView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     PostcardStampView(
         step: .init(title: "Write with a timer", detail: "", systemImage: "timer", accent: .mint)

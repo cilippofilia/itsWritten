@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct UnknownReasonView: View {
     @State private var showWhyAISheet: Bool = false
     let action: ActionVoid
@@ -51,7 +50,6 @@ struct UnknownReasonView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     UnknownReasonView(action: { })
         .environment(AIProviderStore())

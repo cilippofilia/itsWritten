@@ -8,7 +8,6 @@
 import Foundation
 import FoundationModels
 
-@available(iOS 26.0, *)
 struct PubMedSearchTool: Tool {
     let name = "pubmed_search"
     let description = "Search PubMed for relevant biomedical literature using structured medical query fields and return concise evidence summaries."
@@ -360,7 +359,6 @@ struct PubMedSearchTool: Tool {
     }
 }
 
-@available(iOS 26.0, *)
 struct PubMedEvidenceBundle: Hashable {
     let request: PubMedSearchRequest
     let query: String
@@ -378,7 +376,6 @@ struct PubMedEvidenceBundle: Hashable {
     }
 }
 
-@available(iOS 26.0, *)
 struct PubMedSearchRequest: Hashable {
     let topic: String
     let population: String

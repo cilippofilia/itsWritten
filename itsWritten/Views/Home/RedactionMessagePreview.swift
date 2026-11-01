@@ -7,7 +7,6 @@ import SwiftUI
 
 /// The message with its details highlighted, and the details found only in
 /// earlier messages.
-@available(iOS 26.0, *)
 struct RedactionMessagePreview: View {
     let review: RedactionReview
 

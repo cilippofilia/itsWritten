@@ -8,7 +8,6 @@
 import FoundationModels
 
 /// Shared app-level configuration for the on-device model and its tools.
-@available(iOS 26.0, *)
 enum AppLanguageModel {
     static let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
     static let tools: [any Tool] = [

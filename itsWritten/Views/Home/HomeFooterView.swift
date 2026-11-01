@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct HomeFooterView: View {
     let text: String
     let isResponding: Bool
@@ -33,7 +32,6 @@ struct HomeFooterView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     HomeFooterView(text: "Footer", isResponding: false, sendAction: { })
 }

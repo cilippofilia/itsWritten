@@ -9,7 +9,6 @@ import SwiftUI
 
 /// One onboarding step written as a postcard: the message on the left and, past the
 /// divider, the address side with a stamp that gets postmarked when the card is sent.
-@available(iOS 26.0, *)
 struct OnboardingPostcardView: View {
     let step: OnboardingStep
     let ink: PostmarkInk
@@ -70,7 +69,6 @@ struct OnboardingPostcardView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     OnboardingPostcardView(
         step: .init(

@@ -8,7 +8,6 @@
 import SwiftUI
 
 /// The "Why AI?" explanation itself, shown by `WhyAIView`.
-@available(iOS 26.0, *)
 struct WhyAIContentView: View {
     private let appleIntelligenceURL = URL(string: "https://www.apple.com/apple-intelligence/")
 

@@ -9,7 +9,6 @@ import SwiftUI
 
 /// The onboarding postcards stacked as a deck, every card sized to the tallest so the
 /// stack stays even.
-@available(iOS 26.0, *)
 struct OnboardingDeckView: View {
     let steps: [OnboardingStep]
     let deck: OnboardingDeck

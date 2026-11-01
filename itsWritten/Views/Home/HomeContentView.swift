@@ -8,7 +8,6 @@
 import FoundationModels
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct HomeContentView: View {
     @Environment(ConversationViewModel.self) private var viewModel
     @Environment(CountdownViewModel.self) private var countDownViewModel
@@ -65,7 +64,6 @@ struct HomeContentView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     HomeContentView(
         config: .constant(ModelConfiguration()),

@@ -6,7 +6,6 @@
 import SwiftUI
 
 /// Send and Keep on Device.
-@available(iOS 26.0, *)
 struct RedactionReviewButtons: View {
     let requestID: ConsentRequest.ID
     let coordinator: CloudConsentCoordinator

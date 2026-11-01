@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct SamplingSection: View {
     @Binding var configuration: ModelConfiguration
     

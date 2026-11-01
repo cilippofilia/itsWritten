@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct WhyAIView: View {
     var body: some View {
         // Keeps the original centered layout whenever it fits, and only scrolls in short
@@ -23,7 +22,6 @@ struct WhyAIView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     WhyAIView()
 }

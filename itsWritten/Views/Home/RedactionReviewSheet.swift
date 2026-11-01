@@ -7,7 +7,6 @@ import SwiftUI
 
 /// Asks before a message goes to a third-party vendor, and shows what will be
 /// hidden. Tapping a highlighted word switches it between hidden and sent as is.
-@available(iOS 26.0, *)
 struct RedactionReviewSheet: View {
     let request: ConsentRequest
     let review: RedactionReview

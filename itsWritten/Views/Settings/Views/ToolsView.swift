@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct ToolsView: View {
     private let tools: [ToolInfo] = AppLanguageModel.tools.map {
         ToolInfo(id: $0.name, displayName: $0.name.humanizedToolName, summary: $0.description)
@@ -29,7 +28,6 @@ struct ToolsView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Form {
         ToolsView()

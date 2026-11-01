@@ -10,7 +10,6 @@ import SwiftUI
 ///
 /// Every answer goes through `respond(to:allow:)` with the id of the request the alert
 /// was presented for, so a stale alert can never answer a newer prompt.
-@available(iOS 26.0, *)
 struct CloudConsentAlertModifier: ViewModifier {
     let coordinator: CloudConsentCoordinator
 
@@ -27,7 +26,6 @@ struct CloudConsentAlertModifier: ViewModifier {
 }
 
 /// Hosts the alert for one specific request.
-@available(iOS 26.0, *)
 private struct CloudConsentAlertHost: View {
     let coordinator: CloudConsentCoordinator
     let request: ConsentRequest?
@@ -89,7 +87,6 @@ private struct CloudConsentAlertHost: View {
     }
 }
 
-@available(iOS 26.0, *)
 extension View {
     /// Shows the cloud-consent prompt published by `coordinator`.
     func cloudConsentAlert(_ coordinator: CloudConsentCoordinator) -> some View {

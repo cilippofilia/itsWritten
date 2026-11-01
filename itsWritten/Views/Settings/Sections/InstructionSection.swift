@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@available(iOS 26.0, *)
 struct InstructionSection: View {
     @Binding var configuration: ModelConfiguration
     @FocusState private var isFocused: Bool

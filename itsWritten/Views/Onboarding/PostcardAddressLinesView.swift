@@ -8,7 +8,6 @@
 import SwiftUI
 
 /// The empty ruled lines on a postcard's address side.
-@available(iOS 26.0, *)
 struct PostcardAddressLinesView: View {
     var body: some View {
         VStack(spacing: DesignConstants.Spacing.large) {
@@ -22,7 +21,6 @@ struct PostcardAddressLinesView: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     PostcardAddressLinesView()
         .frame(width: 84)

@@ -5,7 +5,6 @@
 
 /// Copy for the cloud-consent alert and the vendor review sheet. A "Send" covers
 /// the rest of the current conversation, so both variants say so.
-@available(iOS 26.0, *)
 enum CloudConsentMessage {
     /// Explains the highlighted words in the review sheet.
     static let redactionHint = String(

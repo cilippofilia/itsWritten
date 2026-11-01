@@ -6,7 +6,6 @@
 import SwiftUI
 
 /// Explains, above the API keys, what happens before anything reaches a cloud model.
-@available(iOS 26.0, *)
 struct CloudPrivacySection: View {
     @Environment(\.locale) private var locale
 
@@ -25,7 +24,6 @@ struct CloudPrivacySection: View {
     }
 }
 
-@available(iOS 26.0, *)
 #Preview {
     Form {
         CloudPrivacySection()

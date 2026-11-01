@@ -18,7 +18,6 @@ import VoltaSDK
 ///
 /// Model calls go through the app's `AIOrchestrator`. There is no stored session:
 /// every send rebuilds the history from `messages` with `ChatHistoryBuilder`.
-@available(iOS 26.0, *)
 @MainActor
 @Observable
 final class ConversationViewModel {
@@ -147,7 +146,6 @@ final class ConversationViewModel {
 
 // MARK: - Sending Messages
 
-@available(iOS 26.0, *)
 extension ConversationViewModel {
     /// Starts a brand-new conversation from the composer's first message. Switches to
     /// chat mode immediately — the caller does not wait on this before showing the
@@ -901,7 +899,6 @@ private enum FailureKind {
 }
 
 /// Everything a single send needs to call the model, captured when the user sends.
-@available(iOS 26.0, *)
 private struct ModelRequest {
     let instructions: String?
     let options: GenerationOptions
