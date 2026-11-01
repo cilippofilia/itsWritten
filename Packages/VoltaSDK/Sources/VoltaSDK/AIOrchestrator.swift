@@ -142,14 +142,15 @@ public struct AIConfiguration: Sendable {
 
     /// How the PCC provider learns whether this process carries the
     /// entitlement (iOS 27+). `.detect` (default) reads the code signature
-    /// on macOS and the embedded provisioning profile on iOS; **an iOS App
-    /// Store build has no profile to read and must state `.granted`** when it
-    /// ships with the capability, or PCC is silently skipped.
+    /// on macOS and the signed entitlements embedded in the executable on iOS
+    /// (App Store builds included), falling back to the provisioning profile
+    /// only when the executable has none. `.granted` without the entitlement
+    /// traps at the first call, so leave detection on unless you know better.
     public var privateCloudComputeEntitlement: PrivateCloudComputeEntitlement = .detect
 
-    /// The user's own cloud accounts (iOS 27+). Each becomes a provider in the
-    /// fallback chain, reached through the public `LanguageModel` protocol.
-    /// Empty by default; ignored entirely on iOS 26. Like the developer key,
+    /// The user's own cloud accounts. Each becomes a provider in the fallback
+    /// chain: through the public `LanguageModel` protocol on iOS 27+, over REST
+    /// (`UserAccountRESTProvider`) below that. Empty by default. Like the developer key,
     /// these are external-privacy providers and never auto-selected by the
     /// `ModelSelector` (the user must connect the account first).
     public var userAccounts: [UserAccount] = []
